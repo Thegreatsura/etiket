@@ -26,6 +26,10 @@ export function qrcode(text: string, options: QRCodeSVGOptions & QRCodeOptions =
     xmlDeclaration,
     ...qrOptions
   } = options;
+  // Auto-upgrade EC level when logo is present (logo obscures modules)
+  if (logo && !qrOptions.ecLevel) {
+    qrOptions.ecLevel = "H";
+  }
   const matrix = encodeQR(text, qrOptions);
   return renderQRCodeSVG(matrix, {
     size,
