@@ -68,14 +68,12 @@ export function buildPlacementMap(mappingRows: number, mappingCols: number): num
   }
 
   // Fill unused corners with fixed pattern (required by spec)
-  // Per ISO 16022: bottom-right 2x2 gets alternating dark/light pattern
+  // Per ISO 16022: the bottom-right corner gets a fixed dark module,
+  // and the module diagonally above-left also gets dark.
+  // Use special marker -2 to indicate "always dark" modules.
   if (placed[(mappingRows - 1) * mappingCols + (mappingCols - 1)] === -1) {
-    // Use special bit positions to produce alternating pattern:
-    // bottom-right: dark (odd bitPos), above: light, left: light, diag: dark
-    placed[(mappingRows - 1) * mappingCols + (mappingCols - 1)] = bitPos; // bottom-right: dark
-    placed[(mappingRows - 1) * mappingCols + (mappingCols - 2)] = bitPos + 1; // bottom-left: light
-    placed[(mappingRows - 2) * mappingCols + (mappingCols - 1)] = bitPos + 1; // top-right: light
-    placed[(mappingRows - 2) * mappingCols + (mappingCols - 2)] = bitPos; // top-left: dark
+    placed[(mappingRows - 1) * mappingCols + (mappingCols - 1)] = -2; // bottom-right: dark
+    placed[(mappingRows - 2) * mappingCols + (mappingCols - 2)] = -2; // diagonal: dark
   }
 
   return Array.from(placed);
@@ -234,7 +232,10 @@ export function placeModules(allCodewords: number[], symbol: SymbolSize): boolea
   for (let r = 0; r < mappingRows; r++) {
     for (let c = 0; c < mappingCols; c++) {
       const bitIndex = placementMap[r * mappingCols + c]!;
-      if (bitIndex >= 0) {
+      if (bitIndex === -2) {
+        // Fixed dark module (bottom-right corner pattern)
+        mappingMatrix[r]![c] = true;
+      } else if (bitIndex >= 0) {
         const codewordIndex = Math.floor(bitIndex / 8);
         const bitOffset = bitIndex % 8;
         if (codewordIndex < allCodewords.length) {
@@ -257,14 +258,14 @@ export function placeModules(allCodewords: number[], symbol: SymbolSize): boolea
       const regionStartRow = vr * (symbol.dataRegionRows + 2);
       const regionStartCol = hr * (symbol.dataRegionCols + 2);
 
-      // Clock track first: alternating top edge and right edge
+      // Clock track: alternating top edge and right edge
       for (let c = 0; c < symbol.dataRegionCols + 2; c++) {
-        // Top alternating line
+        // Top alternating line: even columns dark, odd columns light
         finalMatrix[regionStartRow]![regionStartCol + c] = c % 2 === 0;
       }
       for (let r = 0; r < symbol.dataRegionRows + 2; r++) {
-        // Right alternating line
-        finalMatrix[regionStartRow + r]![regionStartCol + symbol.dataRegionCols + 1] = r % 2 === 0;
+        // Right alternating line: even rows light, odd rows dark
+        finalMatrix[regionStartRow + r]![regionStartCol + symbol.dataRegionCols + 1] = r % 2 !== 0;
       }
 
       // L-shaped finder pattern (drawn after clock track so solid edges take precedence at corners)

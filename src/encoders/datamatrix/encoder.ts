@@ -141,6 +141,8 @@ function encodeC40Text(
 ): number[] {
   const codewords: number[] = [latchCW]; // Latch to C40/Text
   const values: number[] = [];
+  // Track which source character index each value came from
+  const valueCharIndex: number[] = [];
 
   for (let i = 0; i < text.length; i++) {
     const ch = text.charCodeAt(i);
@@ -155,9 +157,12 @@ function encodeC40Text(
     }
     if (set > 0) {
       values.push(set - 1); // Shift indicator (0=shift1, 1=shift2, 2=shift3)
+      valueCharIndex.push(i);
       values.push(value);
+      valueCharIndex.push(i);
     } else {
       values.push(value);
+      valueCharIndex.push(i);
     }
   }
 
@@ -170,9 +175,22 @@ function encodeC40Text(
     i += 3;
   }
 
-  // Handle remaining 1 or 2 values — unlatch to ASCII
+  // Handle remaining 1 or 2 values — unlatch to ASCII and encode remaining chars
   if (i < values.length) {
-    codewords.push(254); // Unlatch
+    codewords.push(254); // Unlatch to ASCII
+    // Find the first source character that wasn't fully packed in a triplet
+    const firstUnpackedCharIdx = valueCharIndex[i]!;
+    const remaining = text.substring(firstUnpackedCharIdx);
+    codewords.push(...encodeASCII(remaining));
+  } else {
+    // All values packed into complete triplets — still need to unlatch
+    // so that padding codewords are interpreted in ASCII mode.
+    // Per ISO 16022, if the C40/Text encoded data fills the symbol
+    // exactly (no padding needed), the implicit end-of-symbol acts
+    // as unlatch. But we can't know the symbol size here, so we
+    // always add the unlatch. The auto-encoder will skip C40/Text
+    // if the unlatch makes it longer than ASCII.
+    codewords.push(254); // Unlatch to ASCII
   }
 
   return codewords;

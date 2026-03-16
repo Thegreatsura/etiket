@@ -36,12 +36,12 @@ function gfMultiply(a: number, b: number): number {
  * @returns Array of EC codewords
  */
 export function generateECCodewords(data: number[], ecCount: number): number[] {
-  // Build generator polynomial
-  // g(x) = (x - a^0)(x - a^1)...(x - a^(ecCount-1))
+  // Build generator polynomial per ISO 16022:
+  // g(x) = (x - a^1)(x - a^2)...(x - a^ecCount)
   const gen: number[] = Array.from({ length: ecCount + 1 }, () => 0);
   gen[0] = 1;
 
-  for (let i = 0; i < ecCount; i++) {
+  for (let i = 1; i <= ecCount; i++) {
     for (let j = gen.length - 1; j >= 1; j--) {
       gen[j] = gen[j - 1]! ^ gfMultiply(gen[j]!, GF_EXP[i]!);
     }
@@ -49,13 +49,15 @@ export function generateECCodewords(data: number[], ecCount: number): number[] {
   }
 
   // Polynomial long division: data polynomial / generator polynomial
+  // gen[0] = constant term, gen[ecCount] = leading coefficient (1)
+  // Division needs coefficients in descending degree order
   const result = Array.from({ length: ecCount }, () => 0);
   for (const byte of data) {
     const lead = byte ^ result[0]!;
     for (let j = 0; j < ecCount - 1; j++) {
-      result[j] = result[j + 1]! ^ gfMultiply(lead, gen[j + 1]!);
+      result[j] = result[j + 1]! ^ gfMultiply(lead, gen[ecCount - 1 - j]!);
     }
-    result[ecCount - 1] = gfMultiply(lead, gen[ecCount]!);
+    result[ecCount - 1] = gfMultiply(lead, gen[0]!);
   }
 
   return result;

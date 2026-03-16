@@ -180,7 +180,7 @@ function encodeTextSegment(text: string, codewords: number[]): void {
   // Each pair: high * 30 + low
   for (let i = 0; i < subCodewords.length; i += 2) {
     const high = subCodewords[i]!;
-    const low = i + 1 < subCodewords.length ? subCodewords[i + 1]! : 0; // pad with 0 per ISO 15438
+    const low = i + 1 < subCodewords.length ? subCodewords[i + 1]! : 29; // pad with 29 (PS) per ISO 15438 5.4.2.1
     codewords.push(high * 30 + low);
   }
 }
@@ -260,26 +260,27 @@ function encodeTextChar(ch: string, currentMode: TextSubMode, values: number[]):
       return TextSubMode.Lower; // shift returns to current mode
     }
   } else if (currentMode === TextSubMode.Mixed) {
-    // Try Lower
-    const lowerVal = getCharValue(ch, TextSubMode.Lower);
-    if (lowerVal !== -1) {
-      values.push(TEXT_SWITCH.MIXED_TO_LOWER); // latch to lower
-      values.push(lowerVal);
-      return TextSubMode.Lower;
+    // Try Punctuation (shift for single char)
+    const punctVal = getCharValue(ch, TextSubMode.Punctuation);
+    if (punctVal !== -1) {
+      values.push(TEXT_SWITCH.MIXED_TO_PUNCT_SHIFT); // PS - shift to punct
+      values.push(punctVal);
+      return TextSubMode.Mixed; // shift returns to mixed
     }
     // Try Alpha
     const alphaVal = getCharValue(ch, TextSubMode.Alpha);
     if (alphaVal !== -1) {
-      values.push(TEXT_SWITCH.MIXED_TO_ALPHA); // latch to alpha
+      values.push(TEXT_SWITCH.MIXED_TO_ALPHA); // AL - latch to alpha
       values.push(alphaVal);
       return TextSubMode.Alpha;
     }
-    // Try Punctuation
-    const punctVal = getCharValue(ch, TextSubMode.Punctuation);
-    if (punctVal !== -1) {
-      values.push(TEXT_SWITCH.MIXED_TO_PUNCT); // latch to punct
-      values.push(punctVal);
-      return TextSubMode.Punctuation;
+    // Try Lower (Mixed -> Alpha -> Lower)
+    const lowerVal = getCharValue(ch, TextSubMode.Lower);
+    if (lowerVal !== -1) {
+      values.push(TEXT_SWITCH.MIXED_TO_ALPHA); // AL - latch to alpha first
+      values.push(TEXT_SWITCH.ALPHA_TO_LOWER); // LL - then latch to lower
+      values.push(lowerVal);
+      return TextSubMode.Lower;
     }
   } else if (currentMode === TextSubMode.Punctuation) {
     // Try Alpha
