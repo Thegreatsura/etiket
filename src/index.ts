@@ -792,6 +792,12 @@ export { encodeGS1128 } from "./encoders/gs1-128";
 export { encodeIdentcode, encodeLeitcode } from "./encoders/deutsche-post";
 export { encodePOSTNET, encodePLANET } from "./encoders/postnet";
 export { encodePlessey } from "./encoders/plessey";
+export {
+  encodeISBT128DIN,
+  encodeISBT128Component,
+  encodeISBT128Expiry,
+  encodeISBT128BloodGroup,
+} from "./encoders/isbt128";
 export { encodeHIBCPrimary, encodeHIBCSecondary, encodeHIBCConcatenated } from "./encoders/hibc";
 export { encodeDataMatrix, encodeGS1DataMatrix } from "./encoders/datamatrix/index";
 export { encodePDF417 } from "./encoders/pdf417/index";
