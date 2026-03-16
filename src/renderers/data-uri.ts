@@ -20,11 +20,23 @@ export function svgToDataURI(svg: string): string {
 }
 
 /**
+ * Convert a UTF-8 string to a binary string suitable for btoa.
+ * Replaces the deprecated unescape(encodeURIComponent(…)) pattern.
+ */
+function utf8ToBinary(str: string): string {
+  const bytes = new TextEncoder().encode(str);
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return binary;
+}
+
+/**
  * Convert SVG string to base64 data URI
  */
 export function svgToBase64(svg: string): string {
-  // Use btoa for base64 encoding
-  const base64 = btoa(unescape(encodeURIComponent(svg)));
+  const base64 = btoa(utf8ToBinary(svg));
   return `data:image/svg+xml;base64,${base64}`;
 }
 
@@ -32,5 +44,5 @@ export function svgToBase64(svg: string): string {
  * Convert SVG string to a plain base64 string (no data URI prefix)
  */
 export function svgToBase64Raw(svg: string): string {
-  return btoa(unescape(encodeURIComponent(svg)));
+  return btoa(utf8ToBinary(svg));
 }

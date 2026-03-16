@@ -14,7 +14,6 @@ declare var process: {
   exit(code?: number): never;
 };
 
-declare function unescape(s: string): string;
 
 declare module "node:fs" {
   export function writeFileSync(path: string, data: string, encoding?: string): void;
