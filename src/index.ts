@@ -25,6 +25,7 @@ import { encodeCode11 } from "./encoders/code11";
 import { encodeGS1128 } from "./encoders/gs1-128";
 import { encodeIdentcode, encodeLeitcode } from "./encoders/deutsche-post";
 import { encodePOSTNET, encodePLANET } from "./encoders/postnet";
+import { encodePlessey } from "./encoders/plessey";
 import { encodeDataMatrix, encodeGS1DataMatrix } from "./encoders/datamatrix/index";
 import { encodePDF417 } from "./encoders/pdf417/index";
 import { encodeAztec } from "./encoders/aztec/index";
@@ -58,7 +59,8 @@ export type BarcodeType =
   | "identcode"
   | "leitcode"
   | "postnet"
-  | "planet";
+  | "planet"
+  | "plessey";
 
 export interface BarcodeOptions extends BarcodeSVGOptions {
   type?: BarcodeType;
@@ -205,6 +207,9 @@ export function barcode(text: string, options: BarcodeOptions = {}): string {
       bars.pop();
       break;
     }
+    case "plessey":
+      bars = encodePlessey(text);
+      break;
     default:
       throw new Error(`Unsupported barcode type: ${type}`);
   }
@@ -759,6 +764,8 @@ export function encode(text: string, options: EncodeOptions = {}): EncodeResult 
       return { type: "1d", bars: encodePOSTNET(text) };
     case "planet":
       return { type: "1d", bars: encodePLANET(text) };
+    case "plessey":
+      return { type: "1d", bars: encodePlessey(text) };
     default:
       throw new Error(`Unsupported encode type: ${type}`);
   }
@@ -784,6 +791,7 @@ export { encodeCode11 } from "./encoders/code11";
 export { encodeGS1128 } from "./encoders/gs1-128";
 export { encodeIdentcode, encodeLeitcode } from "./encoders/deutsche-post";
 export { encodePOSTNET, encodePLANET } from "./encoders/postnet";
+export { encodePlessey } from "./encoders/plessey";
 export { encodeHIBCPrimary, encodeHIBCSecondary, encodeHIBCConcatenated } from "./encoders/hibc";
 export { encodeDataMatrix, encodeGS1DataMatrix } from "./encoders/datamatrix/index";
 export { encodePDF417 } from "./encoders/pdf417/index";
