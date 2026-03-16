@@ -455,6 +455,73 @@ export function event(
   return qrcode(lines.join("\n"), options);
 }
 
+/**
+ * Generate a Swiss QR Code for QR-bill payments (mandatory in Switzerland since 2022)
+ */
+export function swissQR(
+  data: {
+    iban: string;
+    creditor: {
+      name: string;
+      street?: string;
+      houseNumber?: string;
+      postalCode: string;
+      city: string;
+      country: string;
+    };
+    amount?: number;
+    currency?: "CHF" | "EUR";
+    debtor?: {
+      name: string;
+      street?: string;
+      houseNumber?: string;
+      postalCode: string;
+      city: string;
+      country: string;
+    };
+    reference?: string;
+    referenceType?: "QRR" | "SCOR" | "NON";
+    additionalInfo?: string;
+  },
+  options?: QRCodeSVGOptions & QRCodeOptions,
+): string {
+  const lines: string[] = [
+    "SPC", // QR Type
+    "0200", // Version
+    "1", // Coding type (UTF-8)
+    data.iban.replace(/\s/g, ""), // IBAN
+    "S", // Address type (structured)
+    data.creditor.name,
+    data.creditor.street ?? "",
+    data.creditor.houseNumber ?? "",
+    data.creditor.postalCode,
+    data.creditor.city,
+    data.creditor.country,
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "", // Ultimate creditor (reserved, empty)
+    data.amount !== undefined ? data.amount.toFixed(2) : "",
+    data.currency ?? "CHF",
+    // Debtor
+    data.debtor ? "S" : "",
+    data.debtor?.name ?? "",
+    data.debtor?.street ?? "",
+    data.debtor?.houseNumber ?? "",
+    data.debtor?.postalCode ?? "",
+    data.debtor?.city ?? "",
+    data.debtor?.country ?? "",
+    data.referenceType ?? "NON",
+    data.reference ?? "",
+    data.additionalInfo ?? "",
+    "EPD", // Trailer
+  ];
+  return qrcode(lines.join("\n"), { ecLevel: "M", ...options });
+}
+
 function escapeWifi(str: string): string {
   return str.replace(/([\\;,:"'])/g, "\\$1");
 }

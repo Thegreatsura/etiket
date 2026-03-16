@@ -240,6 +240,23 @@ validateBarcode("ABC", "ean13"); // { valid: false, error: '...' }
 isValidInput("HELLO", "code39"); // true
 ```
 
+## Swiss QR Code
+
+Generate QR-bill payment codes (mandatory in Switzerland since 2022):
+
+```ts
+import { swissQR } from "etiket";
+
+swissQR({
+  iban: "CH4431999123000889012",
+  creditor: { name: "Max Muster", postalCode: "8000", city: "Zürich", country: "CH" },
+  amount: 1949.75,
+  currency: "CHF",
+  reference: "210000000003139471430009017",
+  referenceType: "QRR",
+});
+```
+
 ## Raw Encoders
 
 Access encoding functions directly for custom rendering:
