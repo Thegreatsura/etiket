@@ -1,6 +1,6 @@
 # etiket
 
-Zero-dependency barcode & QR code SVG generator. 20+ formats, styled QR codes, tree-shakeable. Pure TypeScript.
+Zero-dependency barcode & QR code SVG generator. 40+ formats, styled QR codes, tree-shakeable. Pure TypeScript.
 
 > [!IMPORTANT]
 > Keep `AGENTS.md` updated with project status.
@@ -85,7 +85,9 @@ src/
     barcode.ts              # Per-format validation
     qr.ts                   # QR validation with metadata
 test/
-  *.test.ts                 # 50 test files, 654+ tests
+  *.test.ts                 # 63 test files, 834+ tests
+  qr-roundtrip.test.ts      # QR encode→decode via jsQR (all versions, EC, masks)
+  barcode-roundtrip.test.ts # 1D barcode structural validation
 docs/
   **/*.md                   # Documentation (mdzilla-compatible)
 ```
@@ -128,5 +130,7 @@ pnpm docs:dev       # npx mdzilla ./docs
 - **Framework:** vitest
 - **Location:** `test/` directory (flat structure)
 - **Coverage:** `@vitest/coverage-v8`
+- **Round-trip testing:** jsQR for QR decode verification, zbarimg for 1D barcode verification
+- **Dev dependencies for testing:** `jsqr`, `zbar.wasm`
 - Run all: `pnpm test`
 - Run single: `pnpm vitest run test/<file>.test.ts`
