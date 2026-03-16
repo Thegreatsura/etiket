@@ -84,15 +84,13 @@
     "test": "pnpm lint && pnpm typecheck && vitest run",
     "typecheck": "tsgo --noEmit",
     "docs:dev": "npx mdzilla ./docs",
-    "release": "pnpm test && pnpm build && changelogen --release && npm publish && git push --follow-tags",
+    "release": "pnpm test && pnpm build && bumpp --commit --tag --push --all",
     "prepack": "pnpm build"
   },
   "devDependencies": {
     "@typescript/native-preview": "7.0.0-dev.20260316.1",
     "@vitest/coverage-v8": "^4.1.0",
-    "automd": "^0.4.3",
     "bumpp": "latest",
-    "changelogen": "latest",
     "citty": "^0.2.1",
     "consola": "^3.4.2",
     "obuild": "^0.4.32",
