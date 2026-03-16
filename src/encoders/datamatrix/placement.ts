@@ -71,11 +71,14 @@ export function buildPlacementMap(
   }
 
   // Fill unused corners with fixed pattern (required by spec)
+  // Per ISO 16022: bottom-right 2x2 gets alternating dark/light pattern
   if (placed[(mappingRows - 1) * mappingCols + (mappingCols - 1)] === -1) {
-    placed[(mappingRows - 1) * mappingCols + (mappingCols - 1)] = bitPos
-    placed[(mappingRows - 1) * mappingCols + (mappingCols - 2)] = bitPos // same bit, padding
-    placed[(mappingRows - 2) * mappingCols + (mappingCols - 1)] = bitPos
-    placed[(mappingRows - 2) * mappingCols + (mappingCols - 2)] = bitPos
+    // Use special bit positions to produce alternating pattern:
+    // bottom-right: dark (odd bitPos), above: light, left: light, diag: dark
+    placed[(mappingRows - 1) * mappingCols + (mappingCols - 1)] = bitPos     // bottom-right: dark
+    placed[(mappingRows - 1) * mappingCols + (mappingCols - 2)] = bitPos + 1 // bottom-left: light
+    placed[(mappingRows - 2) * mappingCols + (mappingCols - 1)] = bitPos + 1 // top-right: light
+    placed[(mappingRows - 2) * mappingCols + (mappingCols - 2)] = bitPos     // top-left: dark
   }
 
   return Array.from(placed)

@@ -3,7 +3,7 @@
  * Function patterns, data placement, alignment patterns
  */
 
-import { ALIGNMENT_POSITIONS, REMAINDER_BITS } from './tables'
+import { ALIGNMENT_POSITIONS } from './tables'
 
 export type Module = boolean | null
 
@@ -122,16 +122,16 @@ function reserveFormatInfo(matrix: Module[][], size: number): void {
 
 /** Reserve version info areas for version 7+ */
 function reserveVersionInfo(matrix: Module[][], size: number): void {
-  // Bottom-left: 6x3 block
+  // Bottom-left block: rows [size-11, size-10, size-9], cols [0..5]
   for (let r = 0; r < 6; r++) {
     for (let c = 0; c < 3; c++) {
       if (matrix[size - 11 + c]![r] === null) matrix[size - 11 + c]![r] = false
     }
   }
-  // Top-right: 3x6 block
-  for (let r = 0; r < 3; r++) {
-    for (let c = 0; c < 6; c++) {
-      if (matrix[r]![size - 11 + c] === null) matrix[r]![size - 11 + c] = false  // actually wrong positions
+  // Top-right block: rows [0..5], cols [size-11, size-10, size-9]
+  for (let r = 0; r < 6; r++) {
+    for (let c = 0; c < 3; c++) {
+      if (matrix[r]![size - 11 + c] === null) matrix[r]![size - 11 + c] = false
     }
   }
 }

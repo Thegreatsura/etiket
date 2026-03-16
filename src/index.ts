@@ -294,6 +294,87 @@ export function geo(lat: number, lng: number, options?: QRCodeSVGOptions & QRCod
   return qrcode(`geo:${lat},${lng}`, options)
 }
 
+/**
+ * Generate a phone call QR code
+ */
+export function phone(number: string, options?: QRCodeSVGOptions & QRCodeOptions): string {
+  return qrcode(`tel:${number}`, options)
+}
+
+/**
+ * Generate a vCard QR code
+ */
+export function vcard(contact: {
+  firstName: string
+  lastName?: string
+  phone?: string
+  email?: string
+  org?: string
+  title?: string
+  url?: string
+  address?: string
+}, options?: QRCodeSVGOptions & QRCodeOptions): string {
+  const lines = [
+    'BEGIN:VCARD',
+    'VERSION:3.0',
+    `N:${contact.lastName ?? ''};${contact.firstName};;;`,
+    `FN:${contact.firstName}${contact.lastName ? ` ${contact.lastName}` : ''}`,
+  ]
+  if (contact.phone) lines.push(`TEL:${contact.phone}`)
+  if (contact.email) lines.push(`EMAIL:${contact.email}`)
+  if (contact.org) lines.push(`ORG:${contact.org}`)
+  if (contact.title) lines.push(`TITLE:${contact.title}`)
+  if (contact.url) lines.push(`URL:${contact.url}`)
+  if (contact.address) lines.push(`ADR:;;${contact.address};;;;`)
+  lines.push('END:VCARD')
+  return qrcode(lines.join('\n'), options)
+}
+
+/**
+ * Generate a MeCard QR code (simpler than vCard, used by Android)
+ */
+export function mecard(contact: {
+  name: string
+  phone?: string
+  email?: string
+  url?: string
+  address?: string
+}, options?: QRCodeSVGOptions & QRCodeOptions): string {
+  let text = `MECARD:N:${contact.name};`
+  if (contact.phone) text += `TEL:${contact.phone};`
+  if (contact.email) text += `EMAIL:${contact.email};`
+  if (contact.url) text += `URL:${contact.url};`
+  if (contact.address) text += `ADR:${contact.address};`
+  text += ';'
+  return qrcode(text, options)
+}
+
+/**
+ * Generate a calendar event QR code (iCalendar format)
+ */
+export function event(ev: {
+  title: string
+  start: Date | string
+  end?: Date | string
+  location?: string
+  description?: string
+}, options?: QRCodeSVGOptions & QRCodeOptions): string {
+  const fmt = (d: Date | string) => {
+    const date = typeof d === 'string' ? new Date(d) : d
+    return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+  }
+  const lines = [
+    'BEGIN:VEVENT',
+    `SUMMARY:${ev.title}`,
+    `DTSTART:${fmt(ev.start)}`,
+  ]
+  if (ev.end) lines.push(`DTEND:${fmt(ev.end)}`)
+  if (ev.location) lines.push(`LOCATION:${ev.location}`)
+  if (ev.description) lines.push(`DESCRIPTION:${ev.description}`)
+  lines.push('END:VEVENT')
+  return qrcode(lines.join('\n'), options)
+}
+
 function escapeWifi(str: string): string {
   return str.replace(/([\\;,:"'])/g, '\\$1')
 }

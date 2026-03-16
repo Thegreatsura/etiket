@@ -24,12 +24,18 @@ export function renderMatrixSVG(
     margin = 2,
   } = options
 
-  const moduleCount = matrix.length
-  const totalModules = moduleCount + margin * 2
+  const rowCount = matrix.length
+  const colCount = matrix[0]?.length ?? 0
+  const maxDim = Math.max(rowCount, colCount)
+  const totalModules = maxDim + margin * 2
   const moduleSize = size / totalModules
 
+  // For rectangular matrices, compute actual SVG dimensions
+  const svgWidth = (colCount + margin * 2) * moduleSize
+  const svgHeight = (rowCount + margin * 2) * moduleSize
+
   const parts: string[] = [
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">`,
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgWidth} ${svgHeight}" width="${svgWidth}" height="${svgHeight}">`,
   ]
 
   if (background !== 'transparent') {
@@ -38,8 +44,8 @@ export function renderMatrixSVG(
 
   // Draw modules as a single path
   const pathParts: string[] = []
-  for (let r = 0; r < moduleCount; r++) {
-    for (let c = 0; c < moduleCount; c++) {
+  for (let r = 0; r < rowCount; r++) {
+    for (let c = 0; c < colCount; c++) {
       if (matrix[r]![c]) {
         const x = (c + margin) * moduleSize
         const y = (r + margin) * moduleSize

@@ -22,19 +22,31 @@ export function renderBarcodeSVG(
     fontFamily = 'monospace',
     margin = 10,
     textAlign = 'center',
+    textPosition = 'bottom',
+    rotation = 0,
     bearerBars = false,
     bearerBarWidth = 4,
   } = options
+
+  const mTop = options.marginTop ?? margin
+  const mBottom = options.marginBottom ?? margin
+  const mLeft = options.marginLeft ?? margin
+  const mRight = options.marginRight ?? margin
 
   // Calculate total width from bar widths
   let totalUnits = 0
   for (const w of bars) totalUnits += w
 
   const barcodeWidth = totalUnits * barWidth
-  const svgWidth = barcodeWidth + margin * 2
   const textHeight = showText ? fontSize + 8 : 0
   const bearerHeight = bearerBars ? bearerBarWidth * 2 : 0
-  const svgHeight = height + margin * 2 + textHeight + bearerHeight
+
+  const contentWidth = barcodeWidth + mLeft + mRight
+  const contentHeight = height + mTop + mBottom + textHeight + bearerHeight
+
+  // For rotation, swap dimensions
+  const svgWidth = rotation === 90 || rotation === 270 ? contentHeight : contentWidth
+  const svgHeight = rotation === 90 || rotation === 270 ? contentWidth : contentHeight
 
   const parts: string[] = [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgWidth} ${svgHeight}" width="${svgWidth}" height="${svgHeight}">`,
@@ -44,28 +56,37 @@ export function renderBarcodeSVG(
     parts.push(`<rect width="100%" height="100%" fill="${background}"/>`)
   }
 
-  const barTop = margin + (bearerBars ? bearerBarWidth : 0)
+  // Apply rotation transform
+  if (rotation !== 0) {
+    const cx = svgWidth / 2
+    const cy = svgHeight / 2
+    parts.push(`<g transform="rotate(${rotation},${cx},${cy}) translate(${(svgWidth - contentWidth) / 2},${(svgHeight - contentHeight) / 2})">`)
+  }
+
+  const textIsTop = textPosition === 'top'
+  const textOffset = textIsTop ? textHeight : 0
+  const barTop = mTop + (bearerBars ? bearerBarWidth : 0) + textOffset
   const barHeight = height
 
   // Bearer bars (top and bottom, for ITF-14)
   if (bearerBars) {
+    const bbTop = mTop + textOffset
     parts.push(
-      `<rect x="${margin}" y="${margin}" width="${barcodeWidth}" height="${bearerBarWidth}" fill="${color}"/>`,
+      `<rect x="${mLeft}" y="${bbTop}" width="${barcodeWidth}" height="${bearerBarWidth}" fill="${color}"/>`,
     )
     parts.push(
-      `<rect x="${margin}" y="${barTop + barHeight}" width="${barcodeWidth}" height="${bearerBarWidth}" fill="${color}"/>`,
-    )
-    // Side bearer bars
-    parts.push(
-      `<rect x="${margin}" y="${margin}" width="${bearerBarWidth}" height="${barHeight + bearerHeight}" fill="${color}"/>`,
+      `<rect x="${mLeft}" y="${barTop + barHeight}" width="${barcodeWidth}" height="${bearerBarWidth}" fill="${color}"/>`,
     )
     parts.push(
-      `<rect x="${margin + barcodeWidth - bearerBarWidth}" y="${margin}" width="${bearerBarWidth}" height="${barHeight + bearerHeight}" fill="${color}"/>`,
+      `<rect x="${mLeft}" y="${bbTop}" width="${bearerBarWidth}" height="${barHeight + bearerHeight}" fill="${color}"/>`,
+    )
+    parts.push(
+      `<rect x="${mLeft + barcodeWidth - bearerBarWidth}" y="${bbTop}" width="${bearerBarWidth}" height="${barHeight + bearerHeight}" fill="${color}"/>`,
     )
   }
 
   // Draw bars
-  let x = margin
+  let x = mLeft
   let isBar = true
   for (const w of bars) {
     const barPixelWidth = w * barWidth
@@ -78,29 +99,39 @@ export function renderBarcodeSVG(
     isBar = !isBar
   }
 
-  // Text below barcode
+  // Text
   if (showText && text) {
-    const textY = barTop + barHeight + (bearerBars ? bearerBarWidth : 0) + fontSize + 4
+    let textY: number
+    if (textIsTop) {
+      textY = mTop + fontSize
+    } else {
+      textY = barTop + barHeight + (bearerBars ? bearerBarWidth : 0) + fontSize + 4
+    }
+
     let textX: number
     let anchor: string
 
     switch (textAlign) {
       case 'left':
-        textX = margin
+        textX = mLeft
         anchor = 'start'
         break
       case 'right':
-        textX = svgWidth - margin
+        textX = contentWidth - mRight
         anchor = 'end'
         break
       default:
-        textX = svgWidth / 2
+        textX = contentWidth / 2
         anchor = 'middle'
     }
 
     parts.push(
       `<text x="${textX}" y="${textY}" text-anchor="${anchor}" font-family="${fontFamily}" font-size="${fontSize}" fill="${color}">${escapeXml(text)}</text>`,
     )
+  }
+
+  if (rotation !== 0) {
+    parts.push('</g>')
   }
 
   parts.push('</svg>')

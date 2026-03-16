@@ -72,15 +72,17 @@ export function writeVersionInfo(matrix: Module[][], version: number): void {
   const size = matrix.length
   const versionInfo = VERSION_INFO[version]!
 
-  // Bottom-left block (6x3) and top-right block (3x6)
+  // 18 bits: bit 0 is LSB
+  // Bottom-left block: 6 rows x 3 cols at rows [size-11, size-10, size-9], cols [0..5]
+  // Top-right block: 3 rows x 6 cols at rows [0..5], cols [size-11, size-10, size-9]
   for (let i = 0; i < 18; i++) {
     const bit = ((versionInfo >> i) & 1) === 1
     const row = Math.floor(i / 3)
-    const col = (i % 3) + size - 11
+    const col = i % 3
 
-    // Top-right
-    matrix[row]![col] = bit
-    // Bottom-left (transposed)
-    matrix[col]![row] = bit  // Actually: matrix[size - 11 + (i%3)][row] — let me fix
+    // Bottom-left: rows (size-11+col), cols (row)
+    matrix[size - 11 + col]![row] = bit
+    // Top-right: rows (row), cols (size-11+col)
+    matrix[row]![size - 11 + col] = bit
   }
 }

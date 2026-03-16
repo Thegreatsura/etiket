@@ -409,15 +409,20 @@ export function padBits(bits: number[], totalBits: number, wordSize: number): nu
     result.push(1)
   }
 
-  // Fill remaining capacity with padding codewords
-  // Padding codewords alternate: all-1 (wordSize bits), all-0, etc.
-  // Actually the spec says to fill unused codeword positions with 0 values
-  // (after the bit-stuffing has been applied). Stuffed 0-codewords become
-  // 0...01 after stuffing. For simplicity, fill with 0-bit padding.
+  // Fill remaining capacity with properly stuffed padding codewords
+  // Each padding codeword is all-zeros, but after bit-stuffing it becomes
+  // (wordSize-1) zero bits followed by a 1 bit (to avoid all-zero codeword)
+  while (result.length + wordSize <= totalBits) {
+    for (let i = 0; i < wordSize - 1; i++) {
+      result.push(0)
+    }
+    result.push(1) // stuff bit to avoid all-zero codeword
+  }
+
+  // Fill any remaining bits with zeros
   while (result.length < totalBits) {
     result.push(0)
   }
 
-  // Truncate if we somehow exceeded (shouldn't happen)
   return result.slice(0, totalBits)
 }

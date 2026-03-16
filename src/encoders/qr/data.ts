@@ -79,9 +79,7 @@ function buildDataBits(
       bits.push(...encodeByteData(data))
       break
     case 'kanji':
-      // Kanji encoding would go here
-      bits.push(...encodeByteData(data))
-      break
+      throw new Error('Kanji encoding mode is not yet supported. Use byte mode for non-ASCII text.')
   }
 
   // Terminator

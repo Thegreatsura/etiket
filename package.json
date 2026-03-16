@@ -31,6 +31,9 @@
       "default": "./dist/aztec.mjs"
     }
   },
+  "bin": {
+    "etiket": "./dist/cli.mjs"
+  },
   "files": [
     "dist"
   ],

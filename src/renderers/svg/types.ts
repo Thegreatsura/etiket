@@ -71,7 +71,13 @@ export interface BarcodeSVGOptions {
   fontSize?: number
   fontFamily?: string
   margin?: number
+  marginTop?: number
+  marginBottom?: number
+  marginLeft?: number
+  marginRight?: number
   textAlign?: 'center' | 'left' | 'right'
-  bearerBars?: boolean // For ITF-14
+  textPosition?: 'bottom' | 'top'
+  rotation?: 0 | 90 | 180 | 270
+  bearerBars?: boolean
   bearerBarWidth?: number
 }

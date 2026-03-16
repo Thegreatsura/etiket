@@ -121,6 +121,47 @@ export function validateBarcode(text: string, type: string): { valid: boolean; e
       return { valid: true }
     }
 
+    case 'code39ext':
+    case 'code93ext': {
+      // Full ASCII (0-127)
+      for (let i = 0; i < text.length; i++) {
+        if (text.charCodeAt(i) > 127) {
+          return { valid: false, error: `${type} only accepts ASCII characters (0-127)` }
+        }
+      }
+      return { valid: true }
+    }
+
+    case 'ean2': {
+      const digits = text.replace(/\D/g, '')
+      if (digits.length !== 2) {
+        return { valid: false, error: 'EAN-2 requires exactly 2 digits' }
+      }
+      return { valid: true }
+    }
+
+    case 'ean5': {
+      const digits = text.replace(/\D/g, '')
+      if (digits.length !== 5) {
+        return { valid: false, error: 'EAN-5 requires exactly 5 digits' }
+      }
+      return { valid: true }
+    }
+
+    case 'gs1-128': {
+      if (text.length === 0) {
+        return { valid: false, error: 'GS1-128 text cannot be empty' }
+      }
+      // Check parenthesized format for valid AI structure
+      if (text.includes('(')) {
+        const aiPattern = /\((\d{2,4})\)/
+        if (!aiPattern.test(text)) {
+          return { valid: false, error: 'GS1-128 has invalid Application Identifier format' }
+        }
+      }
+      return { valid: true }
+    }
+
     default:
       return { valid: true }
   }

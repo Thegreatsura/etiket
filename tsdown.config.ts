@@ -8,6 +8,7 @@ export default defineConfig({
     'src/datamatrix.ts',
     'src/pdf417.ts',
     'src/aztec.ts',
+    'src/cli.ts',
   ],
   format: ['esm'],
   dts: true,
