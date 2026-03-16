@@ -6,6 +6,10 @@
   <br>
   20+ formats, styled QR codes, tree-shakeable. Pure TypeScript, works everywhere.
   <br><br>
+  <a href="https://npmjs.com/package/etiket"><img src="https://img.shields.io/npm/v/etiket?style=flat&colorA=18181B&colorB=F0DB4F" alt="npm version"></a>
+  <a href="https://npmjs.com/package/etiket"><img src="https://img.shields.io/npm/dm/etiket?style=flat&colorA=18181B&colorB=F0DB4F" alt="npm downloads"></a>
+  <a href="https://bundlephobia.com/result?p=etiket"><img src="https://img.shields.io/bundlephobia/minzip/etiket?style=flat&colorA=18181B&colorB=F0DB4F" alt="bundle size"></a>
+  <a href="https://github.com/productdevbook/etiket/blob/main/LICENSE"><img src="https://img.shields.io/github/license/productdevbook/etiket?style=flat&colorA=18181B&colorB=F0DB4F" alt="license"></a>
 </p>
 
 ## Quick Start
