@@ -238,15 +238,13 @@ export function encodeRMQR(text: string, options: RMQROptions = {}): boolean[][]
     }
   }
 
-  // 3. Corner markers (2×2 at bottom-left and top-right)
-  // Bottom-left
+  // 3. Corner finder patterns (from Zint rmqr_setup_grid)
+  // Bottom-left: (v_size-2,0)=dark, (v_size-2,1)=light, (v_size-1,1)=dark
   matrix[rows - 2]![0] = true;
-  matrix[rows - 2]![1] = true;
-  matrix[rows - 1]![0] = true;
-  matrix[rows - 1]![1] = false;
-  // Top-right
+  matrix[rows - 2]![1] = false;
+  matrix[rows - 1]![1] = true;
+  // Top-right: (0,h_size-2)=dark, (1,h_size-2)=light, (1,h_size-1)=dark
   matrix[0]![cols - 2] = true;
-  matrix[0]![cols - 1] = true;
   matrix[1]![cols - 2] = false;
   matrix[1]![cols - 1] = true;
 
@@ -270,8 +268,27 @@ export function encodeRMQR(text: string, options: RMQROptions = {}): boolean[][]
   ];
   if (widthGroupIdx >= 0) {
     for (const ac of SUB_ALIGN[widthGroupIdx]!) {
+      // Vertical timing column
       for (let r = 0; r < rows; r++) {
         matrix[r]![ac] = r % 2 === 0;
+      }
+      // Top square (2x2 dark at rows 1-2, cols ac±1)
+      if (ac - 1 >= 0) {
+        matrix[1]![ac - 1] = true;
+        matrix[2]![ac - 1] = true;
+      }
+      if (ac + 1 < cols) {
+        matrix[1]![ac + 1] = true;
+        matrix[2]![ac + 1] = true;
+      }
+      // Bottom square (2x2 dark at rows v_size-3/-2, cols ac±1)
+      if (ac - 1 >= 0) {
+        matrix[rows - 3]![ac - 1] = true;
+        matrix[rows - 2]![ac - 1] = true;
+      }
+      if (ac + 1 < cols) {
+        matrix[rows - 3]![ac + 1] = true;
+        matrix[rows - 2]![ac + 1] = true;
       }
     }
   }
@@ -307,34 +324,54 @@ export function encodeRMQR(text: string, options: RMQROptions = {}): boolean[][]
     pushBits(allBits, byte, 8);
   }
 
-  let bitIdx = 0;
-  let upward = true;
-  // rMQR zigzag: start from cols-2, skip sub-alignment columns
-  const subAlignCols = new Set<number>();
-  const wgi = [43, 59, 77, 99, 139].indexOf(cols);
-  if (wgi >= 0) {
-    for (const ac of ([[21], [19, 39], [25, 51], [23, 49, 75], [27, 55, 83, 111]] as number[][])[
-      wgi
-    ]!) {
-      subAlignCols.add(ac);
-    }
-  }
-  for (let col = cols - 2; col >= 1; col -= 2) {
-    // Skip sub-alignment column (like QR skips col 6)
-    if (subAlignCols.has(col)) col--;
-    const rowOrder = upward
-      ? Array.from({ length: rows }, (_, i) => rows - 1 - i)
-      : Array.from({ length: rows }, (_, i) => i);
+  // 6b. Data placement: exact Zint qr_populate_grid algorithm for rMQR
+  // x_start = cols - 3 (righthand timing pattern)
+  // Start from bottom (y = rows-1), going up, right col first then left
+  let i = 0;
+  const n = allBits.length;
+  let y = rows - 1;
+  let direction = 1; // 1 = up, 0 = down
+  let row = 0;
+  const xStart = cols - 3;
 
-    for (const r of rowOrder) {
-      for (const c of [col, col - 1]) {
-        if (c >= 0 && c < cols && matrix[r]![c] === null) {
-          matrix[r]![c] = bitIdx < allBits.length ? allBits[bitIdx]! === 1 : false;
-          bitIdx++;
-        }
+  while (i < n) {
+    const x = xStart - row * 2;
+    if (x < 0) break;
+
+    // Right column of pair (x + 1)
+    if (x + 1 < cols && matrix[y]![x + 1] === null) {
+      matrix[y]![x + 1] = allBits[i]! === 1;
+      i++;
+    }
+
+    // Left column of pair (x)
+    if (i < n && x >= 0 && matrix[y]![x] === null) {
+      matrix[y]![x] = allBits[i]! === 1;
+      i++;
+    }
+
+    if (direction === 1) {
+      y--;
+      if (y === -1) {
+        row++;
+        y = 0;
+        direction = 0;
+      }
+    } else {
+      y++;
+      if (y === rows) {
+        row++;
+        y = rows - 1;
+        direction = 1;
       }
     }
-    upward = !upward;
+  }
+
+  // Fill remaining data cells with 0
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (matrix[r]![c] === null) matrix[r]![c] = false;
+    }
   }
 
   // 7. Apply mask: (row/2 + col/3) % 2 == 0 (fixed mask per ISO/IEC 23941)
