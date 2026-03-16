@@ -84,6 +84,8 @@ export { encodeIMb } from "./encoders/imb";
 export { encodeDataMatrix, encodeGS1DataMatrix } from "./encoders/datamatrix/index";
 export { encodePDF417 } from "./encoders/pdf417/index";
 export type { PDF417Options } from "./encoders/pdf417/index";
+export { encodeMicroPDF417 } from "./encoders/micropdf417";
+export type { MicroPDF417Options } from "./encoders/micropdf417";
 export { encodeAztec } from "./encoders/aztec/index";
 export type { AztecOptions } from "./encoders/aztec/index";
 export { encodeHIBCPrimary, encodeHIBCSecondary, encodeHIBCConcatenated } from "./encoders/hibc";
