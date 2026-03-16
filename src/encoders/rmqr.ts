@@ -94,19 +94,30 @@ const RMQR_CCI_LENGTHS: [number, number, number, number][] = [
   [9, 8, 8, 7], // 31: R17x139
 ];
 
-/** Generate 18-bit rMQR format info with BCH error correction */
-function rmqrFormatInfo(formatData: number): number {
-  // BCH(18,6) encoding for rMQR format info
-  // Generator polynomial for BCH(18,6)
-  let bch = formatData << 12;
-  const gen = 0x1f25; // x^12 + x^11 + x^10 + x^9 + x^8 + x^5 + x^2 + 1
-  for (let i = 5; i >= 0; i--) {
-    if (bch & (1 << (i + 12))) {
-      bch ^= gen << i;
-    }
-  }
-  return ((formatData << 12) | bch) ^ 0x1faf2; // XOR mask
-}
+// Pre-computed rMQR format info tables from Zint (ISO/IEC 23941)
+// Index = version_index + (ecLevel == "H" ? 32 : 0)
+// prettier-ignore
+const RMQR_FORMAT_LEFT: number[] = [
+  0x1fab2,0x1e597,0x1dbdd,0x1c4f8,0x1b86c,0x1a749,0x19903,0x18626,
+  0x17f0e,0x1602b,0x15e61,0x14144,0x13dd0,0x122f5,0x11cbf,0x1039a,
+  0x0f1ca,0x0eeef,0x0d0a5,0x0cf80,0x0b314,0x0ac31,0x0927b,0x08d5e,
+  0x07476,0x06b53,0x05519,0x04a3c,0x036a8,0x0298d,0x017c7,0x008e2,
+  0x3f367,0x3ec42,0x3d208,0x3cd2d,0x3b1b9,0x3ae9c,0x390d6,0x38ff3,
+  0x376db,0x369fe,0x357b4,0x34891,0x33405,0x32b20,0x3156a,0x30a4f,
+  0x2f81f,0x2e73a,0x2d970,0x2c655,0x2bac1,0x2a5e4,0x29bae,0x2848b,
+  0x27da3,0x26286,0x25ccc,0x243e9,0x23f7d,0x22058,0x21e12,0x20137,
+];
+// prettier-ignore
+const RMQR_FORMAT_RIGHT: number[] = [
+  0x20a7b,0x2155e,0x22b14,0x23431,0x248a5,0x25780,0x269ca,0x276ef,
+  0x28fc7,0x290e2,0x2aea8,0x2b18d,0x2cd19,0x2d23c,0x2ec76,0x2f353,
+  0x30103,0x31e26,0x3206c,0x33f49,0x343dd,0x35cf8,0x362b2,0x37d97,
+  0x384bf,0x39b9a,0x3a5d0,0x3baf5,0x3c661,0x3d944,0x3e70e,0x3f82b,
+  0x003ae,0x01c8b,0x022c1,0x03de4,0x04170,0x05e55,0x0601f,0x07f3a,
+  0x08612,0x09937,0x0a77d,0x0b858,0x0c4cc,0x0dbe9,0x0e5a3,0x0fa86,
+  0x108d6,0x117f3,0x129b9,0x1369c,0x14a08,0x1552d,0x16b67,0x17442,
+  0x18d6a,0x1924f,0x1ac05,0x1b320,0x1cfb4,0x1d091,0x1eedb,0x1f1fe,
+];
 
 export interface RMQROptions {
   ecLevel?: "M" | "H";
@@ -274,67 +285,30 @@ export function encodeRMQR(text: string, options: RMQROptions = {}): boolean[][]
     if (matrix[r]![cols - 1] === null) matrix[r]![cols - 1] = (r + 1) % 2 === 0;
   }
 
-  // 5. Format info (18 bits total: version + EC level encoded with BCH)
-  // Reserve format info positions (around finder and alignment)
-  // Format info left: 3 rows (1,3,5) x 3 cols (8,9,10) + extra positions
-  // Format info right: near bottom-right alignment
-  // For now: use Zint's format lookup tables
-  const formatData = sizeIdx + (ecLevel === "H" ? 32 : 0);
-  const formatInfo = rmqrFormatInfo(formatData);
+  // 5. Format info from pre-computed Zint tables (18 bits each side)
+  const fmtIdx = sizeIdx + (ecLevel === "H" ? 32 : 0);
+  const leftFmt = RMQR_FORMAT_LEFT[fmtIdx]!;
+  const rightFmt = RMQR_FORMAT_RIGHT[fmtIdx]!;
 
-  // Place format info: 18 bits split between left and right sides
-  // Left side: around top-left finder (rows 1-5, cols 8-10)
-  const leftPos: [number, number][] = [
-    [1, 8],
-    [2, 8],
-    [3, 8],
-    [4, 8],
-    [5, 8],
-    [1, 9],
-    [2, 9],
-    [3, 9],
-    [4, 9],
-    [5, 9],
-    [1, 10],
-    [2, 10],
-    [3, 10],
-    [4, 10],
-    [5, 10],
-    [1, 11],
-    [2, 11],
-    [3, 11],
-  ];
-  for (let i = 0; i < 18 && i < leftPos.length; i++) {
-    const [r, c] = leftPos[i]!;
-    if (r < rows && c < cols) matrix[r]![c] = ((formatInfo >> i) & 1) === 1;
-  }
-  // Right side: near bottom-right alignment
-  const rightPos: [number, number][] = [
-    [rows - 6, arx - 1],
-    [rows - 5, arx - 1],
-    [rows - 4, arx - 1],
-    [rows - 3, arx - 1],
-    [rows - 2, arx - 1],
-    [rows - 6, arx - 2],
-    [rows - 5, arx - 2],
-    [rows - 4, arx - 2],
-    [rows - 3, arx - 2],
-    [rows - 2, arx - 2],
-    [rows - 6, arx - 3],
-    [rows - 5, arx - 3],
-    [rows - 4, arx - 3],
-    [rows - 3, arx - 3],
-    [rows - 2, arx - 3],
-    [rows - 6, arx - 4],
-    [rows - 5, arx - 4],
-    [rows - 4, arx - 4],
-  ];
-  for (let i = 0; i < 18 && i < rightPos.length; i++) {
-    const [r, c] = rightPos[i]!;
-    if (r >= 0 && r < rows && c >= 0 && c < cols) {
-      matrix[r]![c] = ((formatInfo >> i) & 1) === 1;
+  // Left format info: rows 1-5, cols 8-10 (bit = j*5+i), rows 1-3 col 11 (bits 15-17)
+  for (let i = 0; i < 5; i++) {
+    for (let j = 0; j < 3; j++) {
+      matrix[i + 1]![j + 8] = ((leftFmt >> (j * 5 + i)) & 1) === 1;
     }
   }
+  matrix[1]![11] = ((leftFmt >> 15) & 1) === 1;
+  matrix[2]![11] = ((leftFmt >> 16) & 1) === 1;
+  matrix[3]![11] = ((leftFmt >> 17) & 1) === 1;
+
+  // Right format info: rows (rows-6)-(rows-2), cols (cols-8)-(cols-6), + 3 extra
+  for (let i = 0; i < 5; i++) {
+    for (let j = 0; j < 3; j++) {
+      matrix[i + rows - 6]![j + cols - 8] = ((rightFmt >> (j * 5 + i)) & 1) === 1;
+    }
+  }
+  matrix[rows - 6]![cols - 5] = ((rightFmt >> 15) & 1) === 1;
+  matrix[rows - 6]![cols - 4] = ((rightFmt >> 16) & 1) === 1;
+  matrix[rows - 6]![cols - 3] = ((rightFmt >> 17) & 1) === 1;
 
   // 6. Place data bits (column-pair zigzag, skip timing columns)
   const allBits: number[] = [];
