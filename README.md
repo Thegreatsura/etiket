@@ -282,16 +282,44 @@ const svg = renderBarcodeSVG(bars, { height: 100 });
 const qrSvg = renderQRCodeSVG(matrix, { size: 400, dotType: "dots" });
 ```
 
+## Industry Standards
+
+```ts
+import {
+  swissQR,
+  gs1datamatrix,
+  gs1DigitalLink,
+  encodeHIBCPrimary,
+  encodeHIBCSecondary,
+} from "etiket";
+
+// Swiss QR-bill (mandatory in Switzerland since 2022)
+swissQR({ iban: "CH4431999123000889012", creditor: { name: "Max Muster", postalCode: "8000", city: "Zürich", country: "CH" }, amount: 1949.75, currency: "CHF" });
+
+// GS1 DataMatrix (healthcare, supply chain)
+gs1datamatrix("(01)12345678901234(17)260101(10)BATCH01");
+
+// GS1 Digital Link (2027 retail migration)
+gs1DigitalLink({ gtin: "09520123456788", batch: "ABC123", serial: "12345" });
+
+// HIBC (medical device labeling, FDA UDI)
+const hibc = encodeHIBCPrimary("A123", "PROD456");
+barcode(hibc, { type: "code128" }); // Encode in any symbology
+```
+
 ## Features
 
 - Zero dependencies
-- Pure ESM
-- TypeScript-first with strict types
+- Pure ESM, edge-runtime compatible (Cloudflare Workers, Deno, Bun)
+- TypeScript-first with strict types (tsgo)
 - Tree-shakeable sub-path exports
 - CLI tool (`npx etiket`)
-- SVG string output (no DOM required)
-- Works in browser, Node.js, Deno, Bun, workers
-- ~24KB gzipped (full bundle)
+- SVG string output (no DOM required) + `optimizeSVG()` for compact inline
+- GS1 support (100+ AIs, Digital Link, GS1 DataMatrix)
+- HIBC medical device encoding
+- Swiss QR-bill payments
+- Works in browser, Node.js, Deno, Bun, Cloudflare Workers
+- ~27KB gzipped (full bundle)
 
 ## Comparison
 
