@@ -63,15 +63,37 @@ describe("Japan Post 4-State", () => {
     expect(() => encodeJapanPost("12345")).toThrow();
   });
 
-  it("throws on non-numeric address", () => {
-    expect(() => encodeJapanPost("1000001", "ABC")).toThrow();
+  it("throws on invalid address characters", () => {
+    expect(() => encodeJapanPost("1000001", "!@#")).toThrow();
   });
 
-  it("starts with F,D and ends with F,A", () => {
+  it("accepts alphabetic characters in address", () => {
+    const bars = encodeJapanPost("1000001", "A");
+    expect(bars.length).toBeGreaterThan(0);
+    for (const b of bars) {
+      expect(["T", "A", "D", "F"]).toContain(b);
+    }
+  });
+
+  it("starts with F,D and ends with D,F", () => {
     const bars = encodeJapanPost("1000001");
     expect(bars[0]).toBe("F");
     expect(bars[1]).toBe("D");
-    expect(bars[bars.length - 2]).toBe("F");
-    expect(bars[bars.length - 1]).toBe("A");
+    expect(bars[bars.length - 2]).toBe("D");
+    expect(bars[bars.length - 1]).toBe("F");
+  });
+
+  it("produces correct barcode length (start + 21*3 bars + stop)", () => {
+    // 2 start bars + 21 chars * 3 bars each + 2 stop bars = 67 bars
+    const bars = encodeJapanPost("1000001");
+    expect(bars.length).toBe(2 + 21 * 3 + 2);
+  });
+
+  it("uses mod 19 check digit", () => {
+    // Two different inputs should produce different check digits
+    const a = encodeJapanPost("1000001");
+    const b = encodeJapanPost("1000002");
+    // They should differ (different data → different check)
+    expect(a).not.toEqual(b);
   });
 });

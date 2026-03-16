@@ -195,26 +195,71 @@ export function encodeAustraliaPost(fcc: string, dpid: string): FourState[] {
   return bars;
 }
 
-// Japan Post 4-State barcode
-const JP_TABLE: Record<string, FourState[]> = {
-  "0": ["F", "F", "T"],
-  "1": ["D", "A", "F"],
-  "2": ["D", "F", "A"],
-  "3": ["A", "D", "F"],
-  "4": ["F", "D", "A"],
-  "5": ["A", "F", "D"],
-  "6": ["F", "A", "D"],
-  "7": ["D", "D", "A"],
-  "8": ["D", "A", "D"],
-  "9": ["A", "D", "D"],
-  "-": ["F", "T", "F"],
-};
+// Japan Post 4-State barcode (Kasutama / JP4SCC)
+// KASUT_SET defines the order of characters for bar pattern lookup in JAPAN_TABLE
+// KASUT_SET: '1','2','3','4','5','6','7','8','9','0','-','a','b','c','d','e','f','g','h'
+// CH_KASUT_SET defines the order for check digit calculation (mod 19)
+// CH_KASUT_SET: '0','1','2','3','4','5','6','7','8','9','-','a','b','c','d','e','f','g','h'
+const KASUT_SET = "1234567890-abcdefgh";
+const CH_KASUT_SET = "0123456789-abcdefgh";
+
+// JAPAN_TABLE[i] = bar pattern for KASUT_SET[i]
+const JAPAN_TABLE: FourState[][] = [
+  ["F", "F", "T"], // '1'
+  ["F", "D", "A"], // '2'
+  ["D", "F", "A"], // '3'
+  ["F", "A", "D"], // '4'
+  ["F", "T", "F"], // '5'
+  ["D", "A", "F"], // '6'
+  ["A", "F", "D"], // '7'
+  ["A", "D", "F"], // '8'
+  ["T", "F", "F"], // '9'
+  ["F", "T", "T"], // '0'
+  ["T", "F", "T"], // '-'
+  ["D", "A", "T"], // 'a'
+  ["D", "T", "A"], // 'b'
+  ["A", "D", "T"], // 'c'
+  ["T", "D", "A"], // 'd' (also used for padding)
+  ["A", "T", "D"], // 'e'
+  ["T", "A", "D"], // 'f'
+  ["T", "T", "F"], // 'g'
+  ["F", "F", "F"], // 'h'
+];
+
+// Build lookup from character to bar pattern
+const JP_TABLE: Record<string, FourState[]> = {};
+for (let i = 0; i < KASUT_SET.length; i++) {
+  JP_TABLE[KASUT_SET[i]!] = JAPAN_TABLE[i]!;
+}
+
+/**
+ * Convert an input character to its intermediate representation for Japan Post.
+ * Digits and hyphens pass through; letters A-Z are expanded to two-character
+ * sequences using internal characters a-h.
+ */
+function jpExpandChar(c: string): string {
+  if ((c >= "0" && c <= "9") || c === "-") return c;
+  const code = c.charCodeAt(0);
+  if (code >= 65 && code <= 74) {
+    // A-J → 'a' + digit
+    return "a" + CH_KASUT_SET[code - 65]!;
+  }
+  if (code >= 75 && code <= 84) {
+    // K-T → 'b' + digit
+    return "b" + CH_KASUT_SET[code - 75]!;
+  }
+  if (code >= 85 && code <= 90) {
+    // U-Z → 'c' + digit
+    return "c" + CH_KASUT_SET[code - 85]!;
+  }
+  throw new InvalidInputError(`Invalid Japan Post character: ${c}`);
+}
 
 /**
  * Encode Japan Post 4-State Customer barcode (JP4SCC / Kasutama)
  *
  * @param zipcode - 7-digit Japanese postal code
- * @param address - Optional address digits (up to 13 chars)
+ * @param address - Optional address characters (digits, dash, A-Z; up to 13 chars)
  */
 export function encodeJapanPost(zipcode: string, address?: string): FourState[] {
   const zip = zipcode.replace(/-/g, "");
@@ -222,32 +267,42 @@ export function encodeJapanPost(zipcode: string, address?: string): FourState[] 
     throw new InvalidInputError("Japan Post zipcode must be 7 digits");
   }
 
-  let data = zip;
+  // Build intermediate representation
+  let inter = zip; // zipcode is always digits
   if (address) {
-    const clean = address.replace(/\s/g, "");
-    if (!/^[\d-]+$/.test(clean)) {
-      throw new InvalidInputError("Japan Post address only accepts digits and dash");
+    const clean = address.toUpperCase().replace(/\s/g, "");
+    if (!/^[\dA-Z-]+$/.test(clean)) {
+      throw new InvalidInputError("Japan Post address only accepts digits, dash, and A-Z");
     }
-    data += clean;
+    for (const ch of clean) {
+      inter += jpExpandChar(ch);
+    }
   }
 
-  while (data.length < 20) data += "-";
-  data = data.substring(0, 20);
+  // Pad to 20 characters with 'd' and truncate
+  while (inter.length < 20) inter += "d";
+  inter = inter.substring(0, 20);
 
+  // Check digit: sum of CH_KASUT_SET positions, mod 19
   let sum = 0;
-  for (const ch of data) {
-    sum += ch === "-" ? 10 : Number.parseInt(ch, 10);
+  for (const ch of inter) {
+    const pos = CH_KASUT_SET.indexOf(ch);
+    if (pos === -1) throw new InvalidInputError(`Invalid Japan Post character: ${ch}`);
+    sum += pos;
   }
-  data += ((10 - (sum % 10)) % 10).toString();
+  let check = 19 - (sum % 19);
+  if (check === 19) check = 0;
+  const checkChar = CH_KASUT_SET[check]!;
+  inter += checkChar;
 
   const bars: FourState[] = ["F", "D"]; // Start
 
-  for (const ch of data) {
+  for (const ch of inter) {
     const pattern = JP_TABLE[ch];
     if (!pattern) throw new InvalidInputError(`Invalid Japan Post character: ${ch}`);
     bars.push(...pattern);
   }
 
-  bars.push("F", "A"); // Stop
+  bars.push("D", "F"); // Stop
   return bars;
 }
