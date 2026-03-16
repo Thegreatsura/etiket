@@ -5,12 +5,18 @@ import {
   qrcodeTerminal,
   barcodeDataURI,
   qrcodeDataURI,
+  datamatrix,
+  pdf417,
+  aztec,
   wifi,
   email,
   sms,
   geo,
   url,
 } from "../src/index";
+import { renderBarcodeSVG } from "../src/renderers/svg/barcode";
+import { renderQRCodeSVG } from "../src/renderers/svg/qr";
+import { renderMatrixSVG } from "../src/renderers/svg/matrix";
 
 describe("barcode integration", () => {
   const types = [
@@ -223,5 +229,255 @@ describe("convenience functions", () => {
   it("url generates QR SVG", () => {
     const svg = url("https://example.com");
     expect(svg).toContain("<svg");
+  });
+});
+
+describe("SVG accessibility", () => {
+  // Simple test data
+  const testBars = [2, 1, 1, 1, 2];
+  const testMatrix: boolean[][] = [
+    [true, false, true],
+    [false, true, false],
+    [true, false, true],
+  ];
+
+  describe("default role attribute", () => {
+    it("barcode SVG has role=img by default", () => {
+      const svg = renderBarcodeSVG(testBars);
+      expect(svg).toContain('role="img"');
+    });
+
+    it("QR code SVG has role=img by default", () => {
+      const svg = renderQRCodeSVG(testMatrix);
+      expect(svg).toContain('role="img"');
+    });
+
+    it("matrix SVG has role=img by default", () => {
+      const svg = renderMatrixSVG(testMatrix);
+      expect(svg).toContain('role="img"');
+    });
+  });
+
+  describe("custom role attribute", () => {
+    it("barcode SVG supports custom role", () => {
+      const svg = renderBarcodeSVG(testBars, { role: "presentation" });
+      expect(svg).toContain('role="presentation"');
+      expect(svg).not.toContain('role="img"');
+    });
+
+    it("QR code SVG supports custom role", () => {
+      const svg = renderQRCodeSVG(testMatrix, { role: "presentation" });
+      expect(svg).toContain('role="presentation"');
+    });
+
+    it("matrix SVG supports custom role", () => {
+      const svg = renderMatrixSVG(testMatrix, { role: "presentation" });
+      expect(svg).toContain('role="presentation"');
+    });
+  });
+
+  describe("aria-label attribute", () => {
+    it("barcode SVG includes aria-label when provided", () => {
+      const svg = renderBarcodeSVG(testBars, { ariaLabel: "Barcode for product 12345" });
+      expect(svg).toContain('aria-label="Barcode for product 12345"');
+    });
+
+    it("QR code SVG includes aria-label when provided", () => {
+      const svg = renderQRCodeSVG(testMatrix, { ariaLabel: "QR code linking to example.com" });
+      expect(svg).toContain('aria-label="QR code linking to example.com"');
+    });
+
+    it("matrix SVG includes aria-label when provided", () => {
+      const svg = renderMatrixSVG(testMatrix, { ariaLabel: "Data Matrix code" });
+      expect(svg).toContain('aria-label="Data Matrix code"');
+    });
+
+    it("barcode SVG omits aria-label when not provided", () => {
+      const svg = renderBarcodeSVG(testBars);
+      expect(svg).not.toContain("aria-label");
+    });
+
+    it("QR code SVG omits aria-label when not provided", () => {
+      const svg = renderQRCodeSVG(testMatrix);
+      expect(svg).not.toContain("aria-label");
+    });
+  });
+
+  describe("title element", () => {
+    it("barcode SVG includes title element when provided", () => {
+      const svg = renderBarcodeSVG(testBars, { title: "Product barcode" });
+      expect(svg).toContain("<title>Product barcode</title>");
+    });
+
+    it("QR code SVG includes title element when provided", () => {
+      const svg = renderQRCodeSVG(testMatrix, { title: "QR code" });
+      expect(svg).toContain("<title>QR code</title>");
+    });
+
+    it("matrix SVG includes title element when provided", () => {
+      const svg = renderMatrixSVG(testMatrix, { title: "Data Matrix" });
+      expect(svg).toContain("<title>Data Matrix</title>");
+    });
+
+    it("title element appears before other content", () => {
+      const svg = renderBarcodeSVG(testBars, { title: "Test title" });
+      const titleIndex = svg.indexOf("<title>");
+      const rectIndex = svg.indexOf("<rect");
+      expect(titleIndex).toBeLessThan(rectIndex);
+    });
+
+    it("barcode SVG omits title when not provided", () => {
+      const svg = renderBarcodeSVG(testBars);
+      expect(svg).not.toContain("<title>");
+    });
+  });
+
+  describe("desc element", () => {
+    it("barcode SVG includes desc element when provided", () => {
+      const svg = renderBarcodeSVG(testBars, {
+        desc: "A barcode representing product information",
+      });
+      expect(svg).toContain("<desc>A barcode representing product information</desc>");
+    });
+
+    it("QR code SVG includes desc element when provided", () => {
+      const svg = renderQRCodeSVG(testMatrix, { desc: "QR code for URL" });
+      expect(svg).toContain("<desc>QR code for URL</desc>");
+    });
+
+    it("matrix SVG includes desc element when provided", () => {
+      const svg = renderMatrixSVG(testMatrix, { desc: "Matrix code description" });
+      expect(svg).toContain("<desc>Matrix code description</desc>");
+    });
+
+    it("desc appears after title when both provided", () => {
+      const svg = renderBarcodeSVG(testBars, { title: "My title", desc: "My description" });
+      const titleIndex = svg.indexOf("<title>");
+      const descIndex = svg.indexOf("<desc>");
+      expect(titleIndex).toBeLessThan(descIndex);
+    });
+
+    it("barcode SVG omits desc when not provided", () => {
+      const svg = renderBarcodeSVG(testBars);
+      expect(svg).not.toContain("<desc>");
+    });
+  });
+
+  describe("all accessibility options combined", () => {
+    it("barcode SVG supports all accessibility options together", () => {
+      const svg = renderBarcodeSVG(testBars, {
+        ariaLabel: "Barcode label",
+        role: "img",
+        title: "Barcode title",
+        desc: "Barcode description",
+      });
+      expect(svg).toContain('role="img"');
+      expect(svg).toContain('aria-label="Barcode label"');
+      expect(svg).toContain("<title>Barcode title</title>");
+      expect(svg).toContain("<desc>Barcode description</desc>");
+    });
+
+    it("QR code SVG supports all accessibility options together", () => {
+      const svg = renderQRCodeSVG(testMatrix, {
+        ariaLabel: "QR label",
+        role: "img",
+        title: "QR title",
+        desc: "QR description",
+      });
+      expect(svg).toContain('role="img"');
+      expect(svg).toContain('aria-label="QR label"');
+      expect(svg).toContain("<title>QR title</title>");
+      expect(svg).toContain("<desc>QR description</desc>");
+    });
+
+    it("matrix SVG supports all accessibility options together", () => {
+      const svg = renderMatrixSVG(testMatrix, {
+        ariaLabel: "Matrix label",
+        role: "img",
+        title: "Matrix title",
+        desc: "Matrix description",
+      });
+      expect(svg).toContain('role="img"');
+      expect(svg).toContain('aria-label="Matrix label"');
+      expect(svg).toContain("<title>Matrix title</title>");
+      expect(svg).toContain("<desc>Matrix description</desc>");
+    });
+  });
+
+  describe("XSS prevention in accessibility options", () => {
+    it("escapes HTML in ariaLabel", () => {
+      const svg = renderBarcodeSVG(testBars, { ariaLabel: 'test" onclick="alert(1)' });
+      expect(svg).not.toContain('onclick="alert(1)"');
+      expect(svg).toContain("&quot;");
+    });
+
+    it("escapes HTML in title", () => {
+      const svg = renderBarcodeSVG(testBars, { title: "<script>alert(1)</script>" });
+      expect(svg).not.toContain("<script>");
+      expect(svg).toContain("&lt;script&gt;");
+    });
+
+    it("escapes HTML in desc", () => {
+      const svg = renderBarcodeSVG(testBars, { desc: "<img onerror=alert(1)>" });
+      expect(svg).not.toContain("<img");
+      expect(svg).toContain("&lt;img");
+    });
+  });
+
+  describe("high-level API passthrough", () => {
+    it("barcode() passes accessibility options through", () => {
+      const svg = barcode("Hello", {
+        type: "code128",
+        ariaLabel: "Code 128 barcode",
+        title: "Product barcode",
+        desc: "Barcode for product Hello",
+      });
+      expect(svg).toContain('role="img"');
+      expect(svg).toContain('aria-label="Code 128 barcode"');
+      expect(svg).toContain("<title>Product barcode</title>");
+      expect(svg).toContain("<desc>Barcode for product Hello</desc>");
+    });
+
+    it("qrcode() passes accessibility options through", () => {
+      const svg = qrcode("https://example.com", {
+        ariaLabel: "QR code for example.com",
+        title: "Website QR code",
+        desc: "Scan to visit example.com",
+      });
+      expect(svg).toContain('role="img"');
+      expect(svg).toContain('aria-label="QR code for example.com"');
+      expect(svg).toContain("<title>Website QR code</title>");
+      expect(svg).toContain("<desc>Scan to visit example.com</desc>");
+    });
+
+    it("datamatrix() passes accessibility options through", () => {
+      const svg = datamatrix("Hello", {
+        ariaLabel: "Data Matrix",
+        title: "DM title",
+      });
+      expect(svg).toContain('role="img"');
+      expect(svg).toContain('aria-label="Data Matrix"');
+      expect(svg).toContain("<title>DM title</title>");
+    });
+
+    it("pdf417() passes accessibility options through", () => {
+      const svg = pdf417("Hello", {
+        ariaLabel: "PDF417 barcode",
+        title: "PDF417 title",
+      });
+      expect(svg).toContain('role="img"');
+      expect(svg).toContain('aria-label="PDF417 barcode"');
+      expect(svg).toContain("<title>PDF417 title</title>");
+    });
+
+    it("aztec() passes accessibility options through", () => {
+      const svg = aztec("Hello", {
+        ariaLabel: "Aztec code",
+        title: "Aztec title",
+      });
+      expect(svg).toContain('role="img"');
+      expect(svg).toContain('aria-label="Aztec code"');
+      expect(svg).toContain("<title>Aztec title</title>");
+    });
   });
 });
