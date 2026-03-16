@@ -271,14 +271,41 @@ const qrSvg = renderQRCodeSVG(matrix, { size: 400, dotType: "dots" });
 - Works in browser, Node.js, Deno, Bun, workers
 - ~24KB gzipped (full bundle)
 
+## Comparison
+
+| Feature | etiket | [uqr](https://github.com/unjs/uqr) | [bwip-js](https://github.com/metafloor/bwip-js) | [JsBarcode](https://github.com/lindell/JsBarcode) | [qr-code-styling](https://github.com/kozakdenys/qr-code-styling) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| Zero dependencies | :white_check_mark: | :white_check_mark: | :x: (1.5MB+) | :x: (xmldom) | :x: (qrcode) |
+| TypeScript-first | :white_check_mark: | :white_check_mark: | :x: | :x: | Partial |
+| Tree-shakeable | :white_check_mark: | :x: | :x: | :x: | :x: |
+| 1D barcodes (18 types) | :white_check_mark: | :x: | :white_check_mark: (100+) | :white_check_mark: (13) | :x: |
+| QR Code (v1-40, all EC) | :white_check_mark: | :white_check_mark: | :white_check_mark: | :x: | :white_check_mark: |
+| Data Matrix | :white_check_mark: | :x: | :white_check_mark: | :x: | :x: |
+| PDF417 | :white_check_mark: | :x: | :white_check_mark: | :x: | :x: |
+| Aztec Code | :white_check_mark: | :x: | :white_check_mark: | :x: | :x: |
+| QR dot styling (12 types) | :white_check_mark: | :x: | :x: | :x: | :white_check_mark: |
+| QR gradients | :white_check_mark: | :x: | :x: | :x: | :white_check_mark: |
+| QR corner styling | :white_check_mark: | :x: | :x: | :x: | :white_check_mark: |
+| QR logo embedding | :white_check_mark: | :x: | :x: | :x: | :white_check_mark: |
+| CLI tool | :white_check_mark: | :x: | :white_check_mark: | :x: | :x: |
+| Terminal output | :white_check_mark: | :white_check_mark: | :x: | :x: | :x: |
+| Convenience helpers (WiFi, vCard...) | :white_check_mark: | :x: | :x: | :x: | :x: |
+| Input validation | :white_check_mark: | :x: | :x: | :x: | :x: |
+| SVG output | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| PNG/Canvas output | :x: | :x: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| Pure ESM | :white_check_mark: | :white_check_mark: | :x: (CJS) | :x: (CJS) | :x: (CJS) |
+| Bundle size (gzip) | ~24KB | ~12KB | ~160KB | ~15KB | ~30KB+deps |
+
+**etiket is the only library that combines** 1D barcodes + 2D codes + styled QR codes + zero dependencies + tree-shaking in a single package.
+
 ## Inspiration & Credits
 
-Built from scratch, inspired by:
+Built from scratch, inspired by these excellent libraries:
 
-- [uqr](https://github.com/unjs/uqr) — Pure SVG QR approach
-- [bwip-js](https://github.com/metafloor/bwip-js) — Comprehensive barcode formats
-- [JsBarcode](https://github.com/lindell/JsBarcode) — Encoding table reference
-- [qr-code-styling](https://github.com/kozakdenys/qr-code-styling) — QR styling concepts
+- [uqr](https://github.com/unjs/uqr) — Pure SVG QR approach, terminal rendering
+- [bwip-js](https://github.com/metafloor/bwip-js) — Comprehensive barcode format reference (100+ types)
+- [JsBarcode](https://github.com/lindell/JsBarcode) — Encoding table validation, barcode rendering patterns
+- [qr-code-styling](https://github.com/kozakdenys/qr-code-styling) — QR styling concepts (dot types, gradients, corners, logos)
 
 Standards: [ISO/IEC 15417](https://www.iso.org/standard/43896.html) (Code 128), [ISO/IEC 15420](https://www.iso.org/standard/46143.html) (EAN/UPC), [ISO/IEC 18004](https://www.iso.org/standard/62021.html) (QR), [ISO/IEC 16022](https://www.iso.org/standard/44230.html) (Data Matrix), [ISO/IEC 15438](https://www.iso.org/standard/43816.html) (PDF417), [ISO/IEC 24778](https://www.iso.org/standard/41548.html) (Aztec).
 
