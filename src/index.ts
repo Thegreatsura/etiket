@@ -80,6 +80,7 @@ export {
   encodeJapanPost,
 } from "./encoders/fourstate";
 export type { FourState } from "./encoders/fourstate";
+export { encodeIMb } from "./encoders/imb";
 export { encodeDataMatrix, encodeGS1DataMatrix } from "./encoders/datamatrix/index";
 export { encodePDF417 } from "./encoders/pdf417/index";
 export type { PDF417Options } from "./encoders/pdf417/index";
