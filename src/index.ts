@@ -23,7 +23,7 @@ import { encodeMSI } from "./encoders/msi";
 import { encodePharmacode } from "./encoders/pharmacode";
 import { encodeCode11 } from "./encoders/code11";
 import { encodeGS1128 } from "./encoders/gs1-128";
-import { encodeDataMatrix } from "./encoders/datamatrix/index";
+import { encodeDataMatrix, encodeGS1DataMatrix } from "./encoders/datamatrix/index";
 import { encodePDF417 } from "./encoders/pdf417/index";
 import { encodeAztec } from "./encoders/aztec/index";
 import { renderBarcodeSVG } from "./renderers/svg/barcode";
@@ -270,6 +270,18 @@ export function datamatrix(
   options?: { size?: number; color?: string; background?: string; margin?: number },
 ): string {
   const matrix = encodeDataMatrix(text);
+  return renderMatrixSVG(matrix, options);
+}
+
+/**
+ * Generate a GS1 DataMatrix as SVG string
+ * Accepts parenthesized AI format: "(01)12345678901234(21)SERIAL"
+ */
+export function gs1datamatrix(
+  text: string,
+  options?: { size?: number; color?: string; background?: string; margin?: number },
+): string {
+  const matrix = encodeGS1DataMatrix(text);
   return renderMatrixSVG(matrix, options);
 }
 
@@ -687,7 +699,7 @@ export type { MSICheckDigitType } from "./encoders/msi";
 export { encodePharmacode } from "./encoders/pharmacode";
 export { encodeCode11 } from "./encoders/code11";
 export { encodeGS1128 } from "./encoders/gs1-128";
-export { encodeDataMatrix } from "./encoders/datamatrix/index";
+export { encodeDataMatrix, encodeGS1DataMatrix } from "./encoders/datamatrix/index";
 export { encodePDF417 } from "./encoders/pdf417/index";
 export type { PDF417Options } from "./encoders/pdf417/index";
 export { encodeAztec } from "./encoders/aztec/index";

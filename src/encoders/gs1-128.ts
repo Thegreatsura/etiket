@@ -283,7 +283,7 @@ function findAIDefinition(ai: string): AIDefinition | undefined {
  * Parse parenthesized AI format into fields
  * E.g. "(01)12345678901234(17)260101(10)ABC123"
  */
-function parseAIString(text: string): { ai: string; data: string }[] {
+export function parseAIString(text: string): { ai: string; data: string }[] {
   const fields: { ai: string; data: string }[] = [];
   let pos = 0;
 
@@ -331,7 +331,7 @@ function parseAIString(text: string): { ai: string; data: string }[] {
 /**
  * Check if an AI field is variable-length
  */
-function isVariableLength(ai: string): boolean {
+export function isVariableLength(ai: string): boolean {
   const def = findAIDefinition(ai);
   if (def) {
     return def.fixedLength === 0;
