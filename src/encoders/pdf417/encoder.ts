@@ -159,7 +159,7 @@ function encodeTextSegment(text: string, codewords: number[]): void {
   // Each pair: high * 30 + low
   for (let i = 0; i < subCodewords.length; i += 2) {
     const high = subCodewords[i]!
-    const low = i + 1 < subCodewords.length ? subCodewords[i + 1]! : 29 // pad with mode shift to alpha (29 in punct = latch to alpha)
+    const low = i + 1 < subCodewords.length ? subCodewords[i + 1]! : 0 // pad with 0 per ISO 15438
     codewords.push(high * 30 + low)
   }
 }

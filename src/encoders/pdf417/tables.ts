@@ -99,10 +99,11 @@ function generateClusterPatterns(clusterMod: number): number[][] {
     }
   }
 
-  // Sort patterns to match the standard PDF417 canonical ordering
-  // The standard ordering sorts by the pattern interpreted as a specific sequence
+  // Sort patterns to match the standard PDF417 canonical ordering (ISO 15438 Annex F)
+  // The canonical order sorts by elements in reverse: s4, b4, s3, b3, s2, b2, s1, b1
   patterns.sort((a, b) => {
-    for (let i = 0; i < 8; i++) {
+    // Compare in reverse element order
+    for (const i of [7, 6, 5, 4, 3, 2, 1, 0]) {
       if (a[i]! !== b[i]!) return a[i]! - b[i]!
     }
     return 0
