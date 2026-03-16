@@ -1,7 +1,17 @@
 /**
  * Code 128 barcode encoder
  * Supports Code 128 Auto (automatic charset selection: A, B, C)
+ * and forced charset selection (A, B, or C)
  */
+
+import { InvalidInputError } from "../errors";
+
+export type Code128Charset = "auto" | "A" | "B" | "C";
+
+export interface Code128Options {
+  /** Force a specific Code 128 charset (A, B, or C). Defaults to 'auto'. */
+  charset?: Code128Charset;
+}
 
 // Code 128 encoding patterns (bar/space widths)
 // Each pattern is 6 elements: bar, space, bar, space, bar, space
@@ -124,11 +134,37 @@ const CODE_B = 100;
 const CODE_C = 99;
 
 /**
- * Encode text as Code 128 Auto (optimized charset selection)
+ * Encode text as Code 128 barcode
  * Returns array of bar widths (alternating bar/space)
+ *
+ * @param text - The text to encode
+ * @param options - Optional settings including charset selection
+ *   - `'auto'` (default): Automatically selects the optimal charset
+ *   - `'A'`: Force Code 128A (control chars + uppercase + digits)
+ *   - `'B'`: Force Code 128B (printable ASCII: 32-127)
+ *   - `'C'`: Force Code 128C (digit pairs only, input must be even-length digits)
  */
-export function encodeCode128(text: string): number[] {
-  const codes = autoEncode(text);
+export function encodeCode128(text: string, options?: Code128Options): number[] {
+  const charset = options?.charset ?? "auto";
+
+  let codes: number[];
+  switch (charset) {
+    case "auto":
+      codes = autoEncode(text);
+      break;
+    case "A":
+      codes = encodeCharsetA(text);
+      break;
+    case "B":
+      codes = encodeCharsetB(text);
+      break;
+    case "C":
+      codes = encodeCharsetC(text);
+      break;
+    default:
+      throw new InvalidInputError(`Invalid Code 128 charset: ${charset}`);
+  }
+
   const bars: number[] = [];
 
   for (const code of codes) {
@@ -227,4 +263,101 @@ function countNumericFromPos(text: string, pos: number): number {
     count++;
   }
   return count;
+}
+
+/**
+ * Calculate Code 128 checksum and append it to the codes array
+ */
+function appendChecksum(codes: number[]): void {
+  let checksum = codes[0]!;
+  for (let i = 1; i < codes.length; i++) {
+    checksum += codes[i]! * i;
+  }
+  codes.push(checksum % 103);
+}
+
+/**
+ * Encode text using only Code 128A charset
+ * Code 128A supports: ASCII 0-95 (control chars 0-31, space, digits, uppercase, some symbols)
+ */
+function encodeCharsetA(text: string): number[] {
+  const codes: number[] = [START_A];
+
+  for (let i = 0; i < text.length; i++) {
+    const charCode = text.charCodeAt(i);
+    if (charCode >= 0 && charCode < 32) {
+      // Control characters: value = charCode + 64
+      codes.push(charCode + 64);
+    } else if (charCode >= 32 && charCode <= 95) {
+      // Space (32) through underscore (95): value = charCode - 32
+      codes.push(charCode - 32);
+    } else {
+      throw new InvalidInputError(
+        `Character '${text[i]}' (code ${charCode}) is not encodable in Code 128A. ` +
+        `Code 128A supports control characters (0-31) and printable ASCII 32-95 (uppercase, digits, symbols).`,
+      );
+    }
+  }
+
+  appendChecksum(codes);
+  return codes;
+}
+
+/**
+ * Encode text using only Code 128B charset
+ * Code 128B supports: ASCII 32-127 (space, digits, uppercase, lowercase, symbols)
+ */
+function encodeCharsetB(text: string): number[] {
+  const codes: number[] = [START_B];
+
+  for (let i = 0; i < text.length; i++) {
+    const charCode = text.charCodeAt(i);
+    if (charCode >= 32 && charCode <= 127) {
+      // Printable ASCII: value = charCode - 32
+      codes.push(charCode - 32);
+    } else {
+      throw new InvalidInputError(
+        `Character code ${charCode} is not encodable in Code 128B. ` +
+        `Code 128B supports printable ASCII characters (32-127).`,
+      );
+    }
+  }
+
+  appendChecksum(codes);
+  return codes;
+}
+
+/**
+ * Encode text using only Code 128C charset
+ * Code 128C supports: digit pairs (00-99), input must be even-length all-digit string
+ */
+function encodeCharsetC(text: string): number[] {
+  // Validate: must be all digits
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    if (c < 48 || c > 57) {
+      throw new InvalidInputError(
+        `Character '${text[i]}' is not encodable in Code 128C. ` +
+        `Code 128C supports only digits (0-9).`,
+      );
+    }
+  }
+
+  // Validate: must be even length
+  if (text.length % 2 !== 0) {
+    throw new InvalidInputError(
+      `Code 128C requires an even number of digits, got ${text.length}.`,
+    );
+  }
+
+  const codes: number[] = [START_C];
+
+  for (let i = 0; i < text.length; i += 2) {
+    const d1 = text.charCodeAt(i) - 48;
+    const d2 = text.charCodeAt(i + 1) - 48;
+    codes.push(d1 * 10 + d2);
+  }
+
+  appendChecksum(codes);
+  return codes;
 }
