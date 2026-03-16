@@ -83,6 +83,8 @@ export type { FourState } from "./encoders/fourstate";
 export { encodeIMb } from "./encoders/imb";
 export { encodeCodablockF } from "./encoders/codablock-f";
 export { encodeCode16K } from "./encoders/code16k";
+export { encodeMaxiCode } from "./encoders/maxicode";
+export type { MaxiCodeOptions } from "./encoders/maxicode";
 export { encodeDataMatrix, encodeGS1DataMatrix } from "./encoders/datamatrix/index";
 export { encodePDF417 } from "./encoders/pdf417/index";
 export type { PDF417Options } from "./encoders/pdf417/index";
