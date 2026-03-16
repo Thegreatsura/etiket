@@ -294,7 +294,12 @@ import {
 } from "etiket";
 
 // Swiss QR-bill (mandatory in Switzerland since 2022)
-swissQR({ iban: "CH4431999123000889012", creditor: { name: "Max Muster", postalCode: "8000", city: "Zürich", country: "CH" }, amount: 1949.75, currency: "CHF" });
+swissQR({
+  iban: "CH4431999123000889012",
+  creditor: { name: "Max Muster", postalCode: "8000", city: "Zürich", country: "CH" },
+  amount: 1949.75,
+  currency: "CHF",
+});
 
 // GS1 DataMatrix (healthcare, supply chain)
 gs1datamatrix("(01)12345678901234(17)260101(10)BATCH01");
