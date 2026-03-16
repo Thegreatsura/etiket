@@ -263,19 +263,20 @@ const MODMAP: number[] = [
   928,958,989,988,
 ];
 
-// Bullseye finder pattern positions from ZXing BitMatrixParser BITNR array
-// -1 entries = always dark, -2 entries = always light
-// We only need to explicitly set the dark ones; light positions are already default white
+// Bullseye finder pattern + orientation mark dark positions
+// Extracted from bwip-js reference implementation (verified scannable by rxing)
+// Includes concentric rings (rows 9-23, cols 7-22) + corner marks (row 0, cols 28-29)
 // prettier-ignore
 const BULLSEYE_DARK: number[] = [
-  // row*30+col for each -1 entry in ZXing BITNR
-  9 * 30 + 17,  // row 9, col 17
-  10 * 30 + 17, // row 10, col 17
-  10 * 30 + 18, // row 10, col 18
-  16 * 30 + 7,  // row 16, col 7
-  16 * 30 + 21, // row 16, col 21
-  22 * 30 + 11, // row 22, col 11
-  23 * 30 + 16, // row 23, col 16
+  28,29,
+  277,279,280,281,282,283,285,290,308,311,312,313,316,320,338,
+  339,340,348,350,351,352,367,369,370,372,373,374,375,376,381,
+  397,401,404,406,409,411,428,431,432,433,435,436,439,440,441,
+  442,457,460,461,463,464,466,470,488,490,493,495,498,500,518,
+  521,523,524,526,530,531,532,550,552,556,558,560,578,580,582,
+  583,584,585,587,588,607,610,612,616,617,619,621,622,637,639,
+  642,643,644,645,649,650,668,670,672,677,678,680,698,699,700,
+  701,702,704,707,708,710,711,712,
 ];
 
 // ---------------------------------------------------------------------------
@@ -387,6 +388,17 @@ export function encodeMaxiCode(text: string, options: MaxiCodeOptions = {}): boo
       pixs[MODMAP[i]!] = 1;
     }
   }
+
+  // Clear finder/bullseye area (rows 9-23, cols 7-22) then place bullseye
+  // This ensures data bits don't interfere with the finder pattern
+  for (let r = 9; r <= 23; r++) {
+    for (let c = 7; c <= 22; c++) {
+      pixs[r * COLS + c] = 0;
+    }
+  }
+  // Also clear corner mark area
+  pixs[28] = 0;
+  pixs[29] = 0;
 
   // Place bullseye finder pattern dark modules
   for (const pos of BULLSEYE_DARK) {
