@@ -329,57 +329,80 @@ function renderPattern(pattern: number[]): boolean[] {
 }
 
 // ---------------------------------------------------------------------------
-// GF(929) RS error correction (same algorithm as PDF417)
+// GF(929) RS error correction (same field as PDF417, arbitrary EC count)
 // ---------------------------------------------------------------------------
 
 const GF_MOD = 929;
 
+// Build log/antilog tables for GF(929) with primitive element 3
+const RSALOG: number[] = Array.from({ length: GF_MOD });
+RSALOG[0] = 1;
+for (let _i = 1; _i < GF_MOD; _i++) {
+  RSALOG[_i] = (RSALOG[_i - 1]! * 3) % GF_MOD;
+}
+const RSLOG: number[] = Array.from({ length: GF_MOD });
+for (let _i = 0; _i < GF_MOD - 1; _i++) {
+  RSLOG[RSALOG[_i]!] = _i;
+}
+
+/** Multiply two GF(929) elements */
+function rsProd(a: number, b: number): number {
+  if (a === 0 || b === 0) return 0;
+  return RSALOG[(RSLOG[a]! + RSLOG[b]!) % (GF_MOD - 1)]!;
+}
+
+/**
+ * Generate RS generator polynomial coefficients for k EC codewords.
+ * g(x) = (x - 3^1)(x - 3^2)...(x - 3^k)
+ * Returns k coefficients with alternating sign adjustment per BWIPP.
+ */
+function genECCoeffs(k: number): number[] {
+  const coeffs: number[] = Array.from({ length: k + 1 }, () => 0);
+  coeffs[0] = 1;
+  for (let i = 1; i <= k; i++) {
+    coeffs[i] = coeffs[i - 1]!;
+    for (let j = i - 1; j >= 1; j--) {
+      coeffs[j] = (coeffs[j - 1]! + rsProd(coeffs[j]!, RSALOG[i]!)) % GF_MOD;
+    }
+    coeffs[0] = rsProd(coeffs[0]!, RSALOG[i]!);
+  }
+  // Remove leading coefficient (x^k term), keep g_0..g_{k-1}
+  const result = coeffs.slice(0, k);
+  // Negate alternate coefficients (per BWIPP convention)
+  for (let i = k - 1; i >= 0; i -= 2) {
+    result[i] = (GF_MOD - result[i]!) % GF_MOD;
+  }
+  return result;
+}
+
 /**
  * Generate RS error correction codewords over GF(929) for MicroPDF417.
- * Uses the standard PDF417 EC algorithm with custom coefficient count.
+ * Supports arbitrary EC codeword count (not limited to powers of 2).
  */
 function generateMicroPDF417EC(dataCodewords: number[], ecCount: number): number[] {
-  // Build generator polynomial coefficients using log/antilog tables
-  const alog: number[] = Array.from({ length: GF_MOD });
-  const log: number[] = Array.from({ length: GF_MOD });
-  alog[0] = 1;
-  for (let i = 1; i < GF_MOD; i++) {
-    alog[i] = (alog[i - 1]! * 3) % GF_MOD;
-  }
-  for (let i = 0; i < GF_MOD - 1; i++) {
-    log[alog[i]!] = i;
+  const n = dataCodewords.length;
+  const coeffs = genECCoeffs(ecCount);
+
+  // Working array: data codewords followed by EC slots + 1 sentinel
+  const cws: number[] = Array.from({ length: n + ecCount + 1 }, () => 0);
+  for (let i = 0; i < n; i++) {
+    cws[i] = dataCodewords[i]!;
   }
 
-  // Build generator polynomial
-  const coeffs: number[] = Array.from({ length: ecCount + 1 }, () => 0);
-  coeffs[0] = 1;
-  for (let i = 1; i <= ecCount; i++) {
-    for (let j = i; j >= 1; j--) {
-      const t = (log[coeffs[j - 1]!]! + i) % (GF_MOD - 1);
-      coeffs[j] = (coeffs[j]! + alog[t]!) % GF_MOD;
+  // Polynomial long division
+  for (let i = 0; i < n; i++) {
+    const t = (cws[i]! + cws[n]!) % GF_MOD;
+    for (let j = 0; j < ecCount; j++) {
+      cws[n + j] = (cws[n + j + 1]! + GF_MOD - ((t * coeffs[ecCount - j - 1]!) % GF_MOD)) % GF_MOD;
     }
   }
 
-  // Polynomial division
-  const e: number[] = Array.from({ length: ecCount }, () => 0);
-  for (const cw of dataCodewords) {
-    const lead = (cw + e[ecCount - 1]!) % GF_MOD;
-    for (let j = ecCount - 1; j >= 1; j--) {
-      const t = lead !== 0 ? alog[(log[lead]! + log[coeffs[j]!]!) % (GF_MOD - 1)]! : 0;
-      e[j] = (e[j - 1]! + GF_MOD - t) % GF_MOD;
-    }
-    const t0 = lead !== 0 ? alog[(log[lead]! + log[coeffs[0]!]!) % (GF_MOD - 1)]! : 0;
-    e[0] = (GF_MOD - t0) % GF_MOD;
+  // Negate non-zero EC codewords
+  const ec: number[] = [];
+  for (let i = n; i < n + ecCount; i++) {
+    ec.push(cws[i] !== 0 ? (GF_MOD - cws[i]!) % GF_MOD : 0);
   }
-
-  // Negate
-  for (let j = 0; j < ecCount; j++) {
-    if (e[j] !== 0) {
-      e[j] = GF_MOD - e[j]!;
-    }
-  }
-
-  return e.reverse();
+  return ec;
 }
 
 // ---------------------------------------------------------------------------
