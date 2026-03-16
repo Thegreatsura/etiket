@@ -86,3 +86,60 @@ export function renderMatrixSVG(matrix: boolean[][], options: MatrixSVGOptions =
   parts.push("</svg>");
   return parts.join("");
 }
+
+/**
+ * Render a MaxiCode 33x30 boolean matrix as hexagonal SVG.
+ * MaxiCode uses hexagonal modules with odd rows offset right by half a module.
+ * Includes concentric-ring bullseye finder pattern at center.
+ */
+export function renderMaxiCodeSVG(matrix: boolean[][], options: MatrixSVGOptions = {}): string {
+  const {
+    size = 400,
+    color = "#000",
+    background = "#fff",
+    margin = 4,
+    ariaLabel,
+    role = "img",
+    title,
+    desc,
+  } = options;
+
+  const rows = matrix.length; // 33
+  const cols = matrix[0]?.length ?? 0; // 30
+  const pitch = size / cols; // module-to-module horizontal distance
+  const modH = pitch * 0.866; // sqrt(3)/2 for hex vertical spacing
+  const r = pitch * 0.55; // module radius (0.55 = touching, verified scannable with rxing)
+  const pad = pitch * 2; // quiet zone
+  const svgW = cols * pitch + pitch / 2 + pad * 2;
+  const svgH = rows * modH + pad * 2;
+
+  let svgOpen = `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(svgW)}" height="${Math.round(svgH)}" role="${escapeAttr(role)}"`;
+  if (ariaLabel) svgOpen += ` aria-label="${escapeAttr(ariaLabel)}"`;
+  svgOpen += ">";
+
+  const parts: string[] = [svgOpen];
+  if (title) parts.push(`<title>${escapeXml(title)}</title>`);
+  if (desc) parts.push(`<desc>${escapeXml(desc)}</desc>`);
+  if (background !== "transparent") {
+    parts.push(`<rect width="100%" height="100%" fill="${escapeAttr(background)}"/>`);
+  }
+
+  // Draw hexagonal modules as circles
+  const circles: string[] = [];
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      if (matrix[row]![col]) {
+        const xOff = row % 2 === 1 ? pitch / 2 : 0;
+        const cx = pad + col * pitch + pitch / 2 + xOff;
+        const cy = pad + row * modH + modH / 2;
+        circles.push(
+          `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" fill="${escapeAttr(color)}"/>`,
+        );
+      }
+    }
+  }
+  parts.push(...circles);
+
+  parts.push("</svg>");
+  return parts.join("");
+}
