@@ -377,11 +377,11 @@ function microPDF417RS(data: number[], ecCW: number): number[] {
     }
   }
 
-  // Negate non-zero values
+  // Negate non-zero values and reverse (Zint convention)
   for (let j = 0; j < ecCW; j++) {
     if (ec[j] !== 0) ec[j] = GF_MOD - ec[j]!;
   }
-  return ec;
+  return ec.reverse();
 }
 
 // ---------------------------------------------------------------------------
