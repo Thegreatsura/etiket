@@ -127,24 +127,27 @@ export function encodeDotCode(text: string): boolean[][] {
     throw new InvalidInputError("DotCode input must not be empty");
   }
 
-  // Encode data as codewords (ASCII encoding, values 0..112)
-  // DotCode codewords are in range 0..112 (GF(113) symbols)
+  // Encode data as DotCode codewords (Code Set B style: ASCII - 32)
+  // DotCode uses Code 128-like encoding with codewords 0..112
+  // CW 106 = Upper Shift (FNC3), 107 = binary shift, 108-112 = special
   const codewords: number[] = [];
+  // Mode indicator: CW 106 signals start of data
+  codewords.push(106);
   for (const ch of text) {
     const code = ch.charCodeAt(0);
-    if (code > 127) {
-      // Extended: binary shift (codeword 107) + high/low bytes
-      codewords.push(107); // binary shift
+    if (code >= 32 && code <= 127) {
+      // Printable ASCII: charCode - 32 (Code Set B mapping)
+      codewords.push(code - 32);
+    } else if (code < 32) {
+      // Control characters: direct value
+      codewords.push(code + 64);
+    } else {
+      // Extended: binary shift
+      codewords.push(107);
       codewords.push(code % GF);
       if (code >= GF) {
         codewords.push(Math.floor(code / GF));
       }
-    } else if (code >= GF) {
-      // ASCII 113..127 — shift into valid GF(113) range
-      codewords.push(107); // binary shift
-      codewords.push(code % GF);
-    } else {
-      codewords.push(code);
     }
   }
 
