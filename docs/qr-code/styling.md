@@ -134,6 +134,7 @@ qrcode("Hello", {
 ```
 
 **Supported image formats for `imageUrl`:**
+
 - PNG, JPEG, GIF, SVG — used directly in SVG `<image>`
 - ICO (`image/x-icon`, `image/vnd.microsoft.icon`) — auto-converted to PNG
 
