@@ -48,4 +48,26 @@ describe("data URI encoding", () => {
     const decoded = new TextDecoder().decode(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
     expect(decoded).toBe(utf8Svg);
   });
+
+  it("encodes literal % in SVG content (e.g. width='100%')", () => {
+    const svgWithPercent =
+      '<svg xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#000"/></svg>';
+    const uri = svgToDataURI(svgWithPercent);
+    // Must produce valid percent-encoding — decodeURIComponent must not throw
+    const content = uri.replace("data:image/svg+xml,", "");
+    expect(() => decodeURIComponent(content)).not.toThrow();
+    const decoded = decodeURIComponent(content);
+    expect(decoded).toContain("100%");
+    expect(decoded).toContain("fill='#000'");
+  });
+
+  it("preserves nested data URIs (e.g. embedded base64 image)", () => {
+    const svgWithImage =
+      '<svg xmlns="http://www.w3.org/2000/svg"><image href="data:image/png;base64,iVBORw0KGgo="/></svg>';
+    const uri = svgToDataURI(svgWithImage);
+    const content = uri.replace("data:image/svg+xml,", "");
+    expect(() => decodeURIComponent(content)).not.toThrow();
+    const decoded = decodeURIComponent(content);
+    expect(decoded).toContain("data:image/png;base64,iVBORw0KGgo=");
+  });
 });

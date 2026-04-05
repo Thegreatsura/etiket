@@ -78,6 +78,15 @@ export function calculateLogoPlacement(
     if (!/^(https?:|data:image\/)/i.test(options.imageUrl)) {
       throw new InvalidInputError("imageUrl must use https:, http:, or data:image/ scheme");
     }
+    // SVG <image> only supports PNG, JPEG, GIF, and SVG — reject unsupported formats like ICO, BMP
+    const unsupportedMatch = options.imageUrl.match(
+      /^data:image\/(x-icon|vnd\.microsoft\.icon|bmp|tiff|webp)/i,
+    );
+    if (unsupportedMatch) {
+      throw new InvalidInputError(
+        `imageUrl uses unsupported format "${unsupportedMatch[1]}" — SVG <image> supports PNG, JPEG, GIF, and SVG only`,
+      );
+    }
     const imgW = options.imageWidth ?? logoPixelSize;
     const imgH = options.imageHeight ?? logoPixelSize;
     // Center the image within the logo area

@@ -77,6 +77,22 @@ describe("QR logo embedding", () => {
     ).toThrow("potentially dangerous content");
   });
 
+  it("rejects ICO format in imageUrl", () => {
+    expect(() =>
+      renderQRCodeSVG(matrix, {
+        logo: { imageUrl: "data:image/x-icon;base64,AAAA" },
+      }),
+    ).toThrow("unsupported format");
+  });
+
+  it("rejects BMP format in imageUrl", () => {
+    expect(() =>
+      renderQRCodeSVG(matrix, {
+        logo: { imageUrl: "data:image/bmp;base64,AAAA" },
+      }),
+    ).toThrow("unsupported format");
+  });
+
   it("adds background behind logo", () => {
     const svg = renderQRCodeSVG(matrix, {
       logo: { imageUrl: "data:image/png;base64,abc", backgroundColor: "#fff" },

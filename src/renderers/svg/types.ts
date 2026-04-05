@@ -40,10 +40,11 @@ export interface LogoOptions {
   svg?: string;
   /** SVG path data (assumes 100x100 coordinate space) */
   path?: string;
-  /** Image data URI (e.g. "data:image/png;base64,...") or external URL */
+  /** Image data URI (e.g. "data:image/png;base64,...") or external URL (PNG, JPEG, GIF, SVG only) */
   imageUrl?: string;
-  /** Image width/height in pixels (required when using imageUrl) */
+  /** Image width in SVG coordinate units (defaults to logo area size if omitted) */
   imageWidth?: number;
+  /** Image height in SVG coordinate units (defaults to logo area size if omitted) */
   imageHeight?: number;
   /** Logo size as fraction of QR size (0.1 to 0.5, default 0.3) */
   size?: number;

@@ -7,8 +7,10 @@
  */
 export function svgToDataURI(svg: string): string {
   // Use percent-encoding which is more compact for SVGs
+  // IMPORTANT: encode % first to avoid double-encoding the % introduced by later replacements
   const encoded = svg
     .replace(/\s+/g, " ")
+    .replace(/%/g, "%25")
     .replace(/"/g, "'")
     .replace(/#/g, "%23")
     .replace(/{/g, "%7B")

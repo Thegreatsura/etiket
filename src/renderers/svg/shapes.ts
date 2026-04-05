@@ -199,12 +199,6 @@ function outerRoundedRect(x: number, y: number, w: number, h: number, r: number)
 }
 
 function innerRoundedRect(x: number, y: number, w: number, h: number, r: number): string {
-  // Counter-clockwise for hole
-  return (
-    `M${x + r},${y}` +
-    `v${h - 2 * r}a${r},${r},0,0,0,${r},${r}` + // wrong direction but we use even-odd fill
-    `h${w - 2 * r}a${r},${r},0,0,0,${r},-${r}` +
-    `v-${h - 2 * r}a${r},${r},0,0,0,-${r},-${r}` +
-    `h-${w - 2 * r}a${r},${r},0,0,0,-${r},${r}z`
-  );
+  // Same shape as outerRoundedRect — fill-rule="evenodd" creates the hole regardless of winding
+  return outerRoundedRect(x, y, w, h, r);
 }
