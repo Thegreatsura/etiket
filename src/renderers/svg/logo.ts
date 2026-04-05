@@ -6,6 +6,7 @@
 import { InvalidInputError } from "../../errors";
 import type { LogoOptions } from "./types";
 import { escapeAttr } from "./utils";
+import { icoToPngDataURI } from "./ico";
 
 const SVG_DANGEROUS_PATTERN = /<script[\s>]|javascript:|on[a-z]+\s*=|<foreignObject[\s>]/i;
 
@@ -78,14 +79,15 @@ export function calculateLogoPlacement(
     if (!/^(https?:|data:image\/)/i.test(options.imageUrl)) {
       throw new InvalidInputError("imageUrl must use https:, http:, or data:image/ scheme");
     }
-    // SVG <image> only supports PNG, JPEG, GIF, and SVG — reject unsupported formats like ICO, BMP
-    const unsupportedMatch = options.imageUrl.match(
-      /^data:image\/(x-icon|vnd\.microsoft\.icon|bmp|tiff|webp)/i,
+    // Auto-convert ICO/BMP data URIs to PNG (SVG <image> only supports PNG, JPEG, GIF, SVG)
+    const icoMatch = options.imageUrl.match(
+      /^data:image\/(x-icon|vnd\.microsoft\.icon);base64,(.+)$/i,
     );
-    if (unsupportedMatch) {
-      throw new InvalidInputError(
-        `imageUrl uses unsupported format "${unsupportedMatch[1]}" — SVG <image> supports PNG, JPEG, GIF, and SVG only`,
-      );
+    if (icoMatch) {
+      const binary = atob(icoMatch[2]!);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      options = { ...options, imageUrl: icoToPngDataURI(bytes) };
     }
     const imgW = options.imageWidth ?? logoPixelSize;
     const imgH = options.imageHeight ?? logoPixelSize;

@@ -1,6 +1,57 @@
 import { describe, expect, it } from "vitest";
 import { renderQRCodeSVG } from "../src/renderers/svg/qr";
 
+function uint8ToBase64(data: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < data.length; i++) binary += String.fromCharCode(data[i]!);
+  return btoa(binary);
+}
+
+/** Create a minimal valid ICO file with a single 32bpp entry */
+function createTestICO(width: number, height: number, r: number, g: number, b: number): Uint8Array {
+  const bpp = 32;
+  const pixelDataSize = width * height * 4;
+  const andMaskRowStride = Math.ceil(width / 32) * 4;
+  const andMaskSize = andMaskRowStride * height;
+  const headerSize = 40;
+  const imageSize = headerSize + pixelDataSize + andMaskSize;
+  const totalSize = 6 + 16 + imageSize;
+
+  const buf = new Uint8Array(totalSize);
+  const view = new DataView(buf.buffer);
+
+  view.setUint16(0, 0, true);
+  view.setUint16(2, 1, true);
+  view.setUint16(4, 1, true);
+
+  buf[6] = width < 256 ? width : 0;
+  buf[7] = height < 256 ? height : 0;
+  view.setUint16(10, 1, true);
+  view.setUint16(12, bpp, true);
+  view.setUint32(14, imageSize, true);
+  view.setUint32(18, 22, true);
+
+  const imgOff = 22;
+  view.setUint32(imgOff, headerSize, true);
+  view.setInt32(imgOff + 4, width, true);
+  view.setInt32(imgOff + 8, height * 2, true);
+  view.setUint16(imgOff + 12, 1, true);
+  view.setUint16(imgOff + 14, bpp, true);
+
+  const pixelOff = imgOff + headerSize;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = pixelOff + (y * width + x) * 4;
+      buf[i] = b;
+      buf[i + 1] = g;
+      buf[i + 2] = r;
+      buf[i + 3] = 255;
+    }
+  }
+
+  return buf;
+}
+
 const matrix: boolean[][] = [
   [true, false, true, false, true],
   [false, true, false, true, false],
@@ -77,20 +128,25 @@ describe("QR logo embedding", () => {
     ).toThrow("potentially dangerous content");
   });
 
-  it("rejects ICO format in imageUrl", () => {
-    expect(() =>
-      renderQRCodeSVG(matrix, {
-        logo: { imageUrl: "data:image/x-icon;base64,AAAA" },
-      }),
-    ).toThrow("unsupported format");
+  it("auto-converts ICO logo to PNG", () => {
+    // Create minimal valid 1x1 32bpp ICO
+    const ico = createTestICO(1, 1, 255, 0, 0);
+    const icoUri = `data:image/x-icon;base64,${uint8ToBase64(ico)}`;
+    const svg = renderQRCodeSVG(matrix, {
+      logo: { imageUrl: icoUri },
+    });
+    expect(svg).toContain("<image");
+    expect(svg).toContain("data:image/png;base64,");
+    expect(svg).not.toContain("x-icon");
   });
 
-  it("rejects BMP format in imageUrl", () => {
-    expect(() =>
-      renderQRCodeSVG(matrix, {
-        logo: { imageUrl: "data:image/bmp;base64,AAAA" },
-      }),
-    ).toThrow("unsupported format");
+  it("auto-converts vnd.microsoft.icon logo to PNG", () => {
+    const ico = createTestICO(1, 1, 0, 0, 255);
+    const icoUri = `data:image/vnd.microsoft.icon;base64,${uint8ToBase64(ico)}`;
+    const svg = renderQRCodeSVG(matrix, {
+      logo: { imageUrl: icoUri },
+    });
+    expect(svg).toContain("data:image/png;base64,");
   });
 
   it("adds background behind logo", () => {

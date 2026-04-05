@@ -1,6 +1,6 @@
 /**
- * Minimal PNG encoder — assembles valid PNG files from pixel data
- * Uses indexed color (palette) with 2 entries for barcode/QR output
+ * PNG encoder — assembles valid PNG files from pixel data
+ * Supports indexed color (2-entry palette for barcode/QR) and true color (RGBA)
  */
 
 import { crc32 } from "./crc32";
@@ -93,6 +93,54 @@ export function encodePNG(
   offset += ihdr.length;
   png.set(plte, offset);
   offset += plte.length;
+  png.set(idat, offset);
+  offset += idat.length;
+  png.set(iend, offset);
+
+  return png;
+}
+
+/**
+ * Encode RGBA pixel data as a true color PNG (color type 6: RGBA).
+ * @param width Image width
+ * @param height Image height
+ * @param rgba RGBA pixel data, length must be width * height * 4
+ */
+export function encodeTrueColorPNG(width: number, height: number, rgba: Uint8Array): Uint8Array {
+  const ihdrData = new Uint8Array(13);
+  const ihdrView = new DataView(ihdrData.buffer);
+  ihdrView.setUint32(0, width);
+  ihdrView.setUint32(4, height);
+  ihdrData[8] = 8; // bit depth
+  ihdrData[9] = 6; // color type: RGBA
+  ihdrData[10] = 0; // compression
+  ihdrData[11] = 0; // filter
+  ihdrData[12] = 0; // interlace
+
+  const stride = width * 4;
+  const rawSize = height * (1 + stride);
+  const rawData = new Uint8Array(rawSize);
+  let pos = 0;
+
+  for (let y = 0; y < height; y++) {
+    rawData[pos++] = 0; // filter: none
+    rawData.set(rgba.subarray(y * stride, y * stride + stride), pos);
+    pos += stride;
+  }
+
+  const compressed = zlibCompress(rawData);
+
+  const ihdr = createChunk("IHDR", ihdrData);
+  const idat = createChunk("IDAT", compressed);
+  const iend = createChunk("IEND", new Uint8Array(0));
+
+  const totalLength = PNG_SIGNATURE.length + ihdr.length + idat.length + iend.length;
+  const png = new Uint8Array(totalLength);
+  let offset = 0;
+  png.set(PNG_SIGNATURE, offset);
+  offset += PNG_SIGNATURE.length;
+  png.set(ihdr, offset);
+  offset += ihdr.length;
   png.set(idat, offset);
   offset += idat.length;
   png.set(iend, offset);
