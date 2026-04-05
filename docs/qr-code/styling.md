@@ -111,7 +111,31 @@ qrcode("Hello", {
     size: 0.25,
   },
 });
+
+// Or use an image (PNG, JPEG, SVG URL, or data URI)
+import { readFileSync } from "node:fs";
+
+qrcode("Hello", {
+  ecLevel: "H",
+  logo: {
+    imageUrl: "https://example.com/logo.png",
+    // imageWidth / imageHeight are optional (defaults to fill logo area)
+  },
+});
+
+// ICO/favicon files are auto-converted to PNG
+const favicon = readFileSync("favicon.ico");
+qrcode("Hello", {
+  ecLevel: "H",
+  logo: {
+    imageUrl: `data:image/x-icon;base64,${favicon.toString("base64")}`,
+  },
+});
 ```
+
+**Supported image formats for `imageUrl`:**
+- PNG, JPEG, GIF, SVG — used directly in SVG `<image>`
+- ICO (`image/x-icon`, `image/vnd.microsoft.icon`) — auto-converted to PNG
 
 ## Transparent Background
 

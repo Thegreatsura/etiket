@@ -75,7 +75,8 @@ src/
       matrix.ts             # Generic 2D matrix SVG
       shapes.ts             # 12 dot type generators
       gradient.ts           # Linear/radial gradients
-      logo.ts               # Logo embedding (SVG/path/URL)
+      logo.ts               # Logo embedding (SVG/path/URL/ICO)
+      ico.ts                # ICO/BMP → PNG converter for logos
       optimize.ts           # SVG optimization
       types.ts              # All rendering types
       utils.ts              # escapeAttr utility
@@ -84,7 +85,7 @@ src/
       crc32.ts              # CRC32 for PNG chunk checksums
       adler32.ts            # Adler32 for zlib wrapper
       deflate.ts            # Stored DEFLATE + zlib compression
-      png-encoder.ts        # PNG chunk assembly (palette-based)
+      png-encoder.ts        # PNG chunk assembly (palette + true color RGBA)
       rasterize.ts          # bars/matrix → pixel rows → PNG
     text.ts                 # Terminal output (Unicode blocks)
     data-uri.ts             # SVG → Data URI / Base64
@@ -93,7 +94,7 @@ src/
     barcode.ts              # Per-format validation
     qr.ts                   # QR validation with metadata
 test/
-  *.test.ts                 # 67 test files, 905+ tests
+  *.test.ts                 # 70 test files, 950+ tests
   qr-roundtrip.test.ts      # QR encode→decode via jsQR (all versions, EC, masks)
   barcode-roundtrip.test.ts # 1D barcode structural validation
 docs/

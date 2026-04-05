@@ -532,7 +532,7 @@ const svg = qrcode("https://example.com", { dotType: "dots", ecLevel: "H" });
 - SVG accessibility (`ariaLabel`, `role`, `title`, `desc`)
 - Measurement units (`px`, `mm`, `in`, `cm`, `pt`) for print use cases
 - CSS `currentColor` support for theme-aware barcodes
-- Auto EC upgrade to H when QR logo is present
+- Auto EC upgrade to H when QR logo is present (supports PNG, JPEG, SVG, ICO)
 - GS1 support (100+ AIs, Digital Link, GS1 DataMatrix, GS1 DataBar)
 - HIBC medical device encoding + ISBT 128 blood bank labeling
 - Swiss QR-bill payments
