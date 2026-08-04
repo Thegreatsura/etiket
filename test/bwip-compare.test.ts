@@ -83,8 +83,9 @@ const DIVERGENT: Record<string, string> = {
     "the same variant the module pattern is identical",
 
   "codablock-f":
-    "#100 — etiket emits 3 rows of 101 modules with no row separators; BWIPP emits 5 rows " +
-    "of 145 modules (solid separator rows plus row start/stop and K1/K2 check characters)",
+    "#100 — the codewords now match BWIPP exactly; etiket returns only the data rows " +
+    "while BWIPP emits 2r+1 rows including the separators, so the grids differ in height " +
+    "until the renderers support per-row heights (#140)",
 
   code16k:
     "#99 — etiket emits bare Code 128 rows (2 x 112 modules); BWIPP emits 5 x 81 with the " +
