@@ -262,7 +262,7 @@ const RAP_CENTER: number[] = [
 // ---------------------------------------------------------------------------
 
 // prettier-ignore
-const SYMBOL_METRICS: [number, number, number, number, number, number][] = [
+export const MICROPDF417_METRICS: [number, number, number, number, number, number][] = [
   [1, 11,  7,  1, 0,  9],
   [1, 14,  7,  8, 0,  8],
   [1, 17,  7, 36, 0, 36],
@@ -327,6 +327,17 @@ function renderPattern(pattern: number[]): boolean[] {
   return modules
 }
 
+/** The 17 modules of `codeword` rendered in `cluster` (0-2). */
+export function microPDF417CodewordModules(codeword: number, cluster: number): boolean[] {
+  return renderPattern(getCodewordPattern(codeword, cluster))
+}
+
+/** The 10 modules of a row address pattern, from the centre or the left/right table. */
+export function microPDF417RAPModules(index: number, center: boolean): boolean[] {
+  const table = center ? RAP_CENTER : RAP_LEFT_RIGHT
+  return renderRAP(table[((index % 52) + 52) % 52]!)
+}
+
 // ---------------------------------------------------------------------------
 // GF(929) RS error correction (same field as PDF417, arbitrary EC count)
 // ---------------------------------------------------------------------------
@@ -360,7 +371,7 @@ const MICRO_EC_COEFFS: Record<number, number[]> = {
  * MicroPDF417 RS error correction using spec-specific coefficients.
  * Algorithm from Zint pdf417.c — uses pre-computed Microcoeffs table.
  */
-function microPDF417RS(data: number[], ecCW: number): number[] {
+export function microPDF417RS(data: number[], ecCW: number): number[] {
   const coeffs = MICRO_EC_COEFFS[ecCW]
   if (!coeffs) throw new CapacityError(`No MicroPDF417 EC coefficients for k=${ecCW}`)
 
@@ -499,7 +510,7 @@ function selectSize(
   dataCWCount: number,
   requestedCols?: number,
 ): [number, number, number, number, number, number] | undefined {
-  for (const metric of SYMBOL_METRICS) {
+  for (const metric of MICROPDF417_METRICS) {
     const [cols, rows, ecCW] = metric
     if (requestedCols && cols !== requestedCols) continue
     const maxDataCW = rows * cols - ecCW

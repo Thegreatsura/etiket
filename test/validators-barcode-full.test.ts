@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from "vitest"
 import { validateBarcode, isValidInput, validateBarcodeInput } from "../src/validators/barcode"
+import { ENCODE_TYPES } from "../src/_types"
 import { calculateEANCheckDigit, verifyEANCheckDigit } from "../src/validators/barcode"
 import { encodeBars } from "../src/_barcode"
 import { encodePostal } from "../src/_postal"
@@ -149,54 +150,9 @@ describe("validateBarcode — unknown types", () => {
   })
 
   it("still accepts every type the library actually supports", () => {
-    const types = [
-      "code128",
-      "ean13",
-      "ean8",
-      "upca",
-      "upce",
-      "code39",
-      "code39ext",
-      "code93",
-      "code93ext",
-      "itf",
-      "itf14",
-      "codabar",
-      "msi",
-      "pharmacode",
-      "code11",
-      "gs1-128",
-      "identcode",
-      "leitcode",
-      "postnet",
-      "planet",
-      "plessey",
-      "ean2",
-      "ean5",
-      "gs1-databar",
-      "gs1-databar-limited",
-      "gs1-databar-expanded",
-      "qr",
-      "datamatrix",
-      "gs1-datamatrix",
-      "pdf417",
-      "micropdf417",
-      "aztec",
-      "microqr",
-      "rmqr",
-      "maxicode",
-      "dotcode",
-      "hanxin",
-      "codablock-f",
-      "code16k",
-      "jabcode",
-      "rm4scc",
-      "kix",
-      "auspost",
-      "jppost",
-      "imb",
-    ]
-    for (const type of types) {
+    // Driven off the runtime type list, so a new symbology cannot be added
+    // without the validator learning about it
+    for (const type of [...ENCODE_TYPES, "jabcode"]) {
       const result = validateBarcode(validSampleFor(type), type)
       expect(result.error ?? "", type).not.toMatch(/Unknown barcode type/)
     }

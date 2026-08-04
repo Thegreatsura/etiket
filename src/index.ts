@@ -50,6 +50,8 @@ export {
 } from "./_helpers"
 
 // --- Types ---
+/** The symbology names, at runtime — handy for building a picker */
+export { BARCODE_TYPES, ENCODE_TYPES } from "./_types"
 export type {
   BarcodeType,
   BarcodeEncodingOptions,
@@ -130,7 +132,12 @@ export type {
   SymbolSize as DataMatrixSymbolSize,
 } from "./encoders/datamatrix/tables"
 export { SYMBOL_SIZES as DATAMATRIX_SYMBOL_SIZES } from "./encoders/datamatrix/tables"
-export { encodePDF417 } from "./encoders/pdf417/index"
+export { encodePDF417, encodePDF417Sequence } from "./encoders/pdf417/index"
+export type {
+  PDF417SequenceOptions,
+  PDF417MacroOptions,
+  PDF417SharedMacroOptions,
+} from "./encoders/pdf417/index"
 export type { PDF417Options } from "./encoders/pdf417/index"
 export { encodeMicroPDF417 } from "./encoders/micropdf417"
 export type { MicroPDF417Options } from "./encoders/micropdf417"

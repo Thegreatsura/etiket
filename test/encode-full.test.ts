@@ -19,6 +19,7 @@ import { encodeDotCode } from "../src/encoders/dotcode"
 import { encodeHanXin } from "../src/encoders/hanxin"
 import { encodeCodablockF } from "../src/encoders/codablock-f"
 import { encodeCode16K } from "../src/encoders/code16k"
+import { ENCODE_TYPES } from "../src/_types"
 import type { EncodeType } from "../src/_types"
 
 /** Valid sample input for every encode type. */
@@ -48,6 +49,7 @@ const SAMPLES: Array<[EncodeType, string]> = [
   ["gs1-databar", "0012345678901"],
   ["gs1-databar-limited", "0012345678901"],
   ["gs1-databar-expanded", "(01)90012345678908"],
+  ["gs1-databar-truncated", "0012345678901"],
   // Postal
   ["postnet", "12345"],
   ["planet", "12345678901"],
@@ -132,8 +134,12 @@ describe("encode() — every supported type", () => {
   }
 
   it("covers every declared type in the sample table", () => {
-    // Guards against a new EncodeType being added without a test
-    expect(SAMPLES).toHaveLength(44)
+    // EncodeType is derived from ENCODE_TYPES, so this catches a new symbology
+    // being added without a sample — which a hardcoded count could not
+    const sampled = new Set(SAMPLES.map(([type]) => type))
+    const missing = ENCODE_TYPES.filter((type) => !sampled.has(type))
+    expect(missing, "encode types with no sample").toEqual([])
+    expect(sampled.size).toBe(ENCODE_TYPES.length)
   })
 })
 

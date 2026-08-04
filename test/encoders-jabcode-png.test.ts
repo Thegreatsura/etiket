@@ -72,7 +72,7 @@ describe("jabcodePNG", () => {
   it("emits a true-colour PNG", () => {
     const png = jabcodePNG("HELLO")
     // PNG signature
-    expect([...png.slice(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10])
+    expect(Array.from(png.slice(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10])
     // IHDR colour type 6 (RGBA) sits at byte 25
     expect(png[25]).toBe(6)
   })

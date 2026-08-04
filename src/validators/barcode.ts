@@ -12,7 +12,8 @@ import { postnetCheckDigit } from "../encoders/postnet"
 export function calculateEANCheckDigit(digits: number[]): number {
   let sum = 0
   for (let i = 0; i < digits.length; i++) {
-    sum += digits[i]! * (i % 2 === 0 ? 1 : 3)
+    const fromEnd = digits.length - 1 - i
+    sum += digits[i]! * (fromEnd % 2 === 0 ? 3 : 1)
   }
   return (10 - (sum % 10)) % 10
 }

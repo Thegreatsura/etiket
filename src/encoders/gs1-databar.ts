@@ -259,6 +259,21 @@ function omnGroup(val: number, outside: boolean): number {
   return end
 }
 
+/** Options shared by every GS1 DataBar encoder. */
+export interface GS1DataBarOptions {
+  /**
+   * Set the linkage flag, declaring that a 2D composite component sits above
+   * the symbol (ISO/IEC 24723 4.5). Off by default: a standalone symbol.
+   */
+  linkage?: boolean
+}
+
+/** Value the linkage flag adds to the Omnidirectional data value. */
+const OMN_LINKAGE_VALUE = 10000000000000n
+
+/** Value the linkage flag adds to the Limited data value. */
+const LTD_LINKAGE_VALUE = 2015133531096n
+
 /**
  * The two halves of an Omnidirectional symbol.
  *
@@ -276,7 +291,7 @@ interface OmniHalves {
  * Encode a GTIN into the element widths shared by every Omnidirectional
  * variant (Omnidirectional, Truncated, Stacked and Stacked Omnidirectional).
  */
-function omniHalves(gtin: string, variant: string): OmniHalves {
+function omniHalves(gtin: string, variant: string, linkage = false): OmniHalves {
   const digits13 = parseGTIN(gtin, variant)
 
   // Convert 13-digit GTIN to numeric value (without check digit)
@@ -284,6 +299,7 @@ function omniHalves(gtin: string, variant: string): OmniHalves {
   for (let i = 0; i < 13; i++) {
     val = val * 10n + BigInt(digits13.charCodeAt(i) - 48)
   }
+  if (linkage) val += OMN_LINKAGE_VALUE
 
   // Split into left and right pair values
   const leftPair = Number(val / 4537077n)
@@ -358,8 +374,8 @@ function omniHalves(gtin: string, variant: string): OmniHalves {
  *
  * @returns Array of bar widths (alternating bar/space), 45 elements totaling 95 modules
  */
-export function encodeGS1DataBarOmni(gtin: string): number[] {
-  const { left, right } = omniHalves(gtin, "Omnidirectional")
+export function encodeGS1DataBarOmni(gtin: string, options: GS1DataBarOptions = {}): number[] {
+  const { left, right } = omniHalves(gtin, "Omnidirectional", options.linkage)
   return barFirst([1, 1, ...left, ...right, 1, 1])
 }
 
@@ -372,8 +388,8 @@ export function encodeGS1DataBarOmni(gtin: string): number[] {
  *
  * @returns Array of bar widths (alternating bar/space), 45 elements
  */
-export function encodeGS1DataBarTruncated(gtin: string): number[] {
-  const { left, right } = omniHalves(gtin, "Truncated")
+export function encodeGS1DataBarTruncated(gtin: string, options: GS1DataBarOptions = {}): number[] {
+  const { left, right } = omniHalves(gtin, "Truncated", options.linkage)
   return barFirst([1, 1, ...left, ...right, 1, 1])
 }
 
@@ -463,7 +479,7 @@ function ltdGroup(pairVal: number): { group: number; adjustedVal: number } {
  *
  * @returns Array of bar widths (46 elements)
  */
-export function encodeGS1DataBarLimited(gtin: string): number[] {
+export function encodeGS1DataBarLimited(gtin: string, options: GS1DataBarOptions = {}): number[] {
   const digits13 = parseGTIN(gtin, "Limited")
 
   if (digits13[0] !== "0" && digits13[0] !== "1") {
@@ -475,6 +491,7 @@ export function encodeGS1DataBarLimited(gtin: string): number[] {
   for (let i = 0; i < 13; i++) {
     val = val * 10n + BigInt(digits13.charCodeAt(i) - 48)
   }
+  if (options.linkage) val += LTD_LINKAGE_VALUE
 
   // Split into left and right pair values
   const pairVals = [Number(val / 2013571n), Number(val % 2013571n)]
@@ -1081,7 +1098,7 @@ function expandedEncodation(data: string): ExpandedEncodation {
  * encodation method, variable length symbol bit field, compressed data field,
  * general purpose field and padding (ISO/IEC 24724 7.2.5).
  */
-function expBinaryString(data: string, segments: number): number[] {
+function expBinaryString(data: string, segments: number, linkage: boolean): number[] {
   const encodation = expandedEncodation(data)
   const vlfBits = encodation.gpfAllow ? 2 : 0
 
@@ -1094,7 +1111,7 @@ function expBinaryString(data: string, segments: number): number[] {
   const padLength = expRemainingBits(used, segments)
   const symbolChars = (used + padLength) / 12
 
-  const binary: number[] = [0] // linkage flag: standalone, no composite
+  const binary: number[] = [linkage ? 1 : 0] // linkage flag
   for (const bit of encodation.method) binary.push(bit === "1" ? 1 : 0)
   if (encodation.gpfAllow) {
     binary.push(symbolChars & 1, symbolChars > 14 ? 1 : 0)
@@ -1145,8 +1162,8 @@ function expCharWidths(value: number): number[] {
  * @param data - GS1 AI string in parenthesized format, or raw element string
  * @param segments - Symbol characters per row (22 when the symbol is not stacked)
  */
-function expandedSymbol(data: string, segments: number): ExpandedSymbol {
-  const binary = expBinaryString(data, segments)
+function expandedSymbol(data: string, segments: number, linkage = false): ExpandedSymbol {
+  const binary = expBinaryString(data, segments, linkage)
   const dataChars = binary.length / 12
 
   const dataWidths: number[][] = []
@@ -1200,11 +1217,11 @@ function expRowElements(symbol: ExpandedSymbol, start: number, end: number): num
  *
  * @returns Array of bar widths (alternating bar/space)
  */
-export function encodeGS1DataBarExpanded(data: string): number[] {
+export function encodeGS1DataBarExpanded(data: string, options: GS1DataBarOptions = {}): number[] {
   if (data.length === 0) {
     throw new InvalidInputError("GS1 DataBar Expanded: data must not be empty")
   }
-  const symbol = expandedSymbol(data, EXP_SEGMENTS_LINEAR)
+  const symbol = expandedSymbol(data, EXP_SEGMENTS_LINEAR, options.linkage)
   return barFirst(expRowElements(symbol, 0, symbol.chars.length))
 }
 
@@ -1276,8 +1293,12 @@ function finderSeparator(row: number[], separator: number[], from: number, to: n
  * The left half keeps the polarity of the linear symbol, which starts on a
  * space; the right half continues it, so its row starts on a bar.
  */
-function omniStackedRows(gtin: string, variant: string): { top: number[]; bottom: number[] } {
-  const { left, right } = omniHalves(gtin, variant)
+function omniStackedRows(
+  gtin: string,
+  variant: string,
+  linkage = false,
+): { top: number[]; bottom: number[] } {
+  const { left, right } = omniHalves(gtin, variant, linkage)
   return {
     top: elementsToModules([1, 1, ...left, 1, 1], false),
     bottom: elementsToModules([1, 1, ...right, 1, 1], true),
@@ -1293,8 +1314,11 @@ function omniStackedRows(gtin: string, variant: string): { top: number[]; bottom
  *
  * @returns Module matrix, one row per module row
  */
-export function encodeGS1DataBarStacked(gtin: string): boolean[][] {
-  const { top, bottom } = omniStackedRows(gtin, "Stacked")
+export function encodeGS1DataBarStacked(
+  gtin: string,
+  options: GS1DataBarOptions = {},
+): boolean[][] {
+  const { top, bottom } = omniStackedRows(gtin, "Stacked", options.linkage)
 
   const separator = Array.from<number>({ length: OMN_STACKED_WIDTH }).fill(0)
   for (let i = 1; i < OMN_STACKED_WIDTH; i++) {
@@ -1318,8 +1342,11 @@ export function encodeGS1DataBarStacked(gtin: string): boolean[][] {
  *
  * @returns Module matrix, one row per module row
  */
-export function encodeGS1DataBarStackedOmni(gtin: string): boolean[][] {
-  const { top, bottom } = omniStackedRows(gtin, "Stacked Omnidirectional")
+export function encodeGS1DataBarStackedOmni(
+  gtin: string,
+  options: GS1DataBarOptions = {},
+): boolean[][] {
+  const { top, bottom } = omniStackedRows(gtin, "Stacked Omnidirectional", options.linkage)
 
   const above = top.map((module) => 1 - module)
   padSeparator(above)
@@ -1372,7 +1399,7 @@ function expFinderPositions(width: number): number[] {
  */
 export function encodeGS1DataBarExpandedStacked(
   data: string,
-  options: { segments?: number } = {},
+  options: GS1DataBarOptions & { segments?: number } = {},
 ): boolean[][] {
   if (data.length === 0) {
     throw new InvalidInputError("GS1 DataBar Expanded Stacked: data must not be empty")
@@ -1384,7 +1411,7 @@ export function encodeGS1DataBarExpandedStacked(
     )
   }
 
-  const symbol = expandedSymbol(data, segments)
+  const symbol = expandedSymbol(data, segments, options.linkage)
   const rowCount = Math.ceil(symbol.chars.length / segments)
 
   const rows: number[][] = []

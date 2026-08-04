@@ -14,7 +14,7 @@ import { InvalidInputError } from "../../errors"
 export const START_PATTERN: readonly number[] = [8, 1, 1, 1, 1, 1, 1, 3]
 
 /** Stop pattern: 18 modules (includes terminating bar) — bar,space,bar,space,bar,space,bar,space,bar */
-export const STOP_PATTERN: readonly number[] = [7, 1, 1, 1, 1, 1, 1, 2, 1]
+export const STOP_PATTERN: readonly number[] = [7, 1, 1, 3, 1, 1, 1, 2, 1]
 
 /**
  * PDF417 codeword-to-module-pattern tables from ISO/IEC 15438:2001(E) Annex A.

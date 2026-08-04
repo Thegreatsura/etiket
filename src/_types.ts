@@ -15,34 +15,39 @@ import type { HanXinOptions } from "./encoders/hanxin"
 import type { DataMatrixSizeOptions } from "./encoders/datamatrix/tables"
 
 /** Width-modulated linear symbologies rendered by `barcode()`. */
-export type BarcodeType =
-  | "code128"
-  | "ean13"
-  | "ean8"
-  | "code39"
-  | "code39ext"
-  | "code93"
-  | "code93ext"
-  | "itf"
-  | "itf14"
-  | "upca"
-  | "upce"
-  | "ean2"
-  | "ean5"
-  | "codabar"
-  | "msi"
-  | "pharmacode"
-  | "code11"
-  | "gs1-128"
-  | "identcode"
-  | "leitcode"
-  | "postnet"
-  | "planet"
-  | "plessey"
-  | "gs1-databar"
-  | "gs1-databar-limited"
-  | "gs1-databar-expanded"
-  | "gs1-databar-truncated"
+// prettier-ignore
+export const BARCODE_TYPES = [
+  "code128",
+  "ean13",
+  "ean8",
+  "code39",
+  "code39ext",
+  "code93",
+  "code93ext",
+  "itf",
+  "itf14",
+  "upca",
+  "upce",
+  "ean2",
+  "ean5",
+  "codabar",
+  "msi",
+  "pharmacode",
+  "code11",
+  "gs1-128",
+  "identcode",
+  "leitcode",
+  "postnet",
+  "planet",
+  "plessey",
+  "gs1-databar",
+  "gs1-databar-limited",
+  "gs1-databar-expanded",
+  "gs1-databar-truncated",
+] as const
+
+/** Width-modulated linear symbologies rendered by `barcode()`. */
+export type BarcodeType = (typeof BARCODE_TYPES)[number]
 
 export interface BarcodeEncodingOptions {
   type?: BarcodeType
@@ -55,29 +60,34 @@ export interface BarcodeEncodingOptions {
 
 export interface BarcodeOptions extends BarcodeEncodingOptions, BarcodeSVGOptions {}
 
+/** The symbologies `encode()` handles beyond the linear ones. */
+// prettier-ignore
+export const EXTRA_ENCODE_TYPES = [
+  "rm4scc",
+  "kix",
+  "auspost",
+  "jppost",
+  "imb",
+  "qr",
+  "microqr",
+  "rmqr",
+  "datamatrix",
+  "gs1-datamatrix",
+  "pdf417",
+  "micropdf417",
+  "aztec",
+  "maxicode",
+  "dotcode",
+  "hanxin",
+  "codablock-f",
+  "code16k",
+] as const
+
 /** Every symbology `encode()` can produce raw output for. */
-export type EncodeType =
-  | BarcodeType
-  // 4-state and height-modulated postal
-  | "rm4scc"
-  | "kix"
-  | "auspost"
-  | "jppost"
-  | "imb"
-  // 2D and stacked
-  | "qr"
-  | "microqr"
-  | "rmqr"
-  | "datamatrix"
-  | "gs1-datamatrix"
-  | "pdf417"
-  | "micropdf417"
-  | "aztec"
-  | "maxicode"
-  | "dotcode"
-  | "hanxin"
-  | "codablock-f"
-  | "code16k"
+export const ENCODE_TYPES = [...BARCODE_TYPES, ...EXTRA_ENCODE_TYPES] as const
+
+/** Every symbology `encode()` can produce raw output for. */
+export type EncodeType = (typeof ENCODE_TYPES)[number]
 
 export interface EncodeOptions extends Omit<BarcodeEncodingOptions, "type"> {
   type?: EncodeType

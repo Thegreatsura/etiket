@@ -8,6 +8,7 @@
  */
 
 export { barcode, barcodeDataURI, barcodeBase64, encodeBars } from "./_barcode"
+export { BARCODE_TYPES } from "./_types"
 export type { BarcodeType, BarcodeOptions, BarcodeEncodingOptions } from "./_types"
 export type { BarcodeSVGOptions } from "./renderers/svg/types"
 

@@ -53,6 +53,7 @@ import {
   encodeKIX,
   encodeLeitcode,
   encodeMicroPDF417,
+  encodePDF417,
   encodeMSI,
   encodePharmacode,
   encodePlessey,
@@ -72,15 +73,18 @@ import {
  * description of the divergence, both of which end up in the test title.
  */
 const DIVERGENT: Record<string, string> = {
+  pdf417:
+    "#143 — matches exactly for pure uppercase payloads (HELLO, ABCDEF) and diverges for " +
+    "anything with digits, spaces or lower case: the text compaction sub-mode latches and " +
+    "the numeric-compaction choice differ. Codeword patterns and EC agree, and the symbols " +
+    "decode, so this may be a valid alternative encoding — but the sub-mode code has never " +
+    "been covered by a test",
+
   micropdf417:
     "not a defect — etiket picks a smaller variant than BWIPP for the same data (1x11 vs " +
     "1x14), and zxing decodes every one of these payloads from the smaller symbol; where " +
     "both pick the same variant the module pattern is identical. Kept here so the " +
     "difference stays visible rather than being silently asserted away (#136)",
-
-  "gs1-composite":
-    "#104 — etiket stuffs the literal AI text into a MicroPDF417 (11 x 54 modules); BWIPP " +
-    "emits the real CC-A composite component (3 x 99 modules)",
 }
 
 // ---------------------------------------------------------------------------
@@ -430,6 +434,17 @@ describe("bwip-js cross-verification: stacked and 2D", () => {
     payloads: ["ABC123", "Hello", "Han Xin Code"],
     etiket: (p) => encodeHanXin(p),
     bwip: (p) => bwipMatrix("hanxin", p),
+  })
+
+  runMatrix({
+    // PDF417 shipped a 16-module stop pattern where the standard wants 18
+    // (#142); nothing compared it against the reference until now
+    format: "pdf417",
+    payloads: ["HELLO", "PDF417 TEST", "123456789012"],
+    // Fixed columns: the two implementations pick different aspect ratios, and
+    // this comparison is about the module patterns, not the shape choice
+    etiket: (p) => encodePDF417(p, { columns: 2, ecLevel: 2 }).matrix,
+    bwip: (p) => bwipMatrix("pdf417", p, { columns: 2, eclevel: 2 }),
   })
 
   runMatrix({

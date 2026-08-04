@@ -224,7 +224,21 @@ function encodeTextSegment(text: string, codewords: number[]): void {
     codewords.push(MODE_LATCH.TEXT_COMPACTION)
   }
 
+  for (const cw of textToCodewords(text)) {
+    codewords.push(cw)
+  }
+}
+
+/**
+ * Pack text into codewords without a mode latch.
+ *
+ * This is the form the Macro PDF417 optional fields take: the reader is
+ * already in text compaction when it reads them, so the 900 latch must not
+ * appear.
+ */
+export function textToCodewords(text: string): number[] {
   const subCodewords = textToSubCodewords(text)
+  const codewords: number[] = []
 
   // Pack sub-codewords into pairs → codewords
   // Each pair: high * 30 + low
@@ -233,6 +247,8 @@ function encodeTextSegment(text: string, codewords: number[]): void {
     const low = i + 1 < subCodewords.length ? subCodewords[i + 1]! : 29 // pad with 29 (PS) per ISO 15438 5.4.2.1
     codewords.push(high * 30 + low)
   }
+
+  return codewords
 }
 
 /**
@@ -387,16 +403,31 @@ function getCharValue(ch: string, mode: TextSubMode): number {
 function encodeNumericSegment(digits: string, codewords: number[]): void {
   codewords.push(MODE_LATCH.NUMERIC_COMPACTION)
 
+  for (const cw of numericToCodewords(digits)) {
+    codewords.push(cw)
+  }
+}
+
+/**
+ * Encode a run of digits with numeric compaction, without the 902 mode latch.
+ *
+ * The Macro PDF417 optional fields that carry numbers (segment count, time
+ * stamp, file size, checksum) use this bare form.
+ */
+export function numericToCodewords(digits: string): number[] {
+  const codewords: number[] = []
+
   // Process in groups of up to 44 digits
   let pos = 0
   while (pos < digits.length) {
     const chunk = digits.slice(pos, pos + 44)
-    const numericCodewords = numericToBase900(chunk)
-    for (const cw of numericCodewords) {
+    for (const cw of numericToBase900(chunk)) {
       codewords.push(cw)
     }
     pos += 44
   }
+
+  return codewords
 }
 
 /**
