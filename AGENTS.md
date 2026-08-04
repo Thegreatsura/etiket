@@ -142,7 +142,10 @@ pnpm docs:dev       # npx mdzilla ./docs
 ## Code Conventions
 
 - **Pure ESM** — no CJS
-- **Zero runtime dependencies** — CLI deps (citty, consola) are bundled
+- **Zero runtime dependencies** — the library is transformed 1:1; `src/cli.ts`
+  is a separate bundle entry (see `build.config.ts`) so citty and consola end up
+  inside `dist/cli.mjs` instead of in `dependencies`. The CI `package` job packs
+  the tarball and runs the CLI from a clean install to keep that honest.
 - **TypeScript strict** — TypeScript 7 (`tsc`) for typecheck
 - **Formatter:** oxfmt (double quotes, no semicolons — `semi: false` in `.oxfmtrc.json`)
 - **Linter:** oxlint (unicorn, typescript, oxc plugins)

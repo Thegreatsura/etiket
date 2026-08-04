@@ -22,7 +22,37 @@ on:
       - "docs/**"
 
 jobs:
-  build:
+  test:
+    name: Test (node ${{ matrix.node }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        node: [20, 22, 24]
+        include:
+          - os: windows-latest
+            node: 22
+    steps:
+      - uses: actions/checkout@v5
+      - run: corepack enable
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - name: 📦 Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: 👀 Lint
+        run: pnpm lint
+      - name: 🔍 Typecheck
+        run: pnpm typecheck
+      - name: 🧪 Test
+        run: pnpm vitest run
+      - name: 🚀 Build
+        run: pnpm build
+
+  package:
+    name: Packed artifact smoke test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -33,11 +63,33 @@ jobs:
           cache: pnpm
       - name: 📦 Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: 👀 Lint
-        run: pnpm lint
-      - name: 🔍 Typecheck
-        run: pnpm typecheck
-      - name: 🧪 Test
-        run: pnpm test
       - name: 🚀 Build
         run: pnpm build
+      - name: 📦 Pack
+        run: npm pack --pack-destination "$RUNNER_TEMP"
+      # Installs the tarball exactly as a user would, in a directory with none
+      # of the repo's devDependencies present. This is what catches a CLI that
+      # imports a dependency the package does not declare.
+      - name: 🔎 Install the tarball into a clean project
+        run: |
+          mkdir -p "$RUNNER_TEMP/consumer"
+          cd "$RUNNER_TEMP/consumer"
+          npm init -y > /dev/null
+          npm install "$RUNNER_TEMP"/etiket-*.tgz
+      - name: 🔎 Run the CLI from the installed package
+        run: |
+          cd "$RUNNER_TEMP/consumer"
+          ./node_modules/.bin/etiket qr "hello" | head -c 80
+          ./node_modules/.bin/etiket barcode 1234567890 --type code128 | head -c 80
+          ./node_modules/.bin/etiket datamatrix "DM" --shape rectangle --dmre | head -c 80
+      - name: 🔎 Import every entry point from the installed package
+        run: |
+          cd "$RUNNER_TEMP/consumer"
+          node --input-type=module -e "
+            const entries = ['etiket', 'etiket/barcode', 'etiket/postal', 'etiket/qr', 'etiket/datamatrix', 'etiket/pdf417', 'etiket/aztec', 'etiket/png']
+            for (const entry of entries) {
+              const mod = await import(entry)
+              if (Object.keys(mod).length === 0) throw new Error(entry + ' exported nothing')
+              console.log(entry, Object.keys(mod).length, 'exports')
+            }
+          "
