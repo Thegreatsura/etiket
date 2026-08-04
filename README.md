@@ -68,7 +68,10 @@ import { qrcode, qrcodeDataURI, qrcodeBase64, qrcodeTerminal, microqr, rmqr } fr
 import { datamatrix, gs1datamatrix } from "etiket/datamatrix"
 import { pdf417, micropdf417 } from "etiket/pdf417"
 import { aztec } from "etiket/aztec"
+import { maxicode, dotcode, hanxin, codablockf, code16k } from "etiket/2d"
 import { barcodePNG, qrcodePNG, postalPNG } from "etiket/png" // PNG output
+import { validateBarcode, validateQRInput } from "etiket/validators"
+import { EtiketError, InvalidInputError, CapacityError } from "etiket/errors"
 ```
 
 ## Supported Formats
@@ -380,6 +383,32 @@ event({
 })
 ```
 
+## Batch Generation
+
+```ts
+import { barcodes, barcodeSheet, qrcodeSheet } from "etiket"
+
+// Many symbols, one call, shared options
+const labels = barcodes(["SKU-001", "SKU-002", "SKU-003"], {
+  type: "code128",
+  height: 50,
+})
+
+// Or a single SVG document holding a grid of them — a label sheet
+const sheet = barcodeSheet(
+  orders.map((o) => o.tracking),
+  {
+    type: "code128",
+    columns: 3,
+    gap: 12,
+    labels: orders.map((o) => o.reference),
+  },
+)
+
+// Progress on a long batch
+qrcodeSheet(tickets, { columns: 4, onProgress: (done, total) => bar.update(done / total) })
+```
+
 ## Validation
 
 ```ts
@@ -626,11 +655,39 @@ const svg = qrcode("https://example.com", { dotType: "dots", ecLevel: "H" });
 - Measurement units (`px`, `mm`, `in`, `cm`, `pt`) for print use cases
 - CSS `currentColor` support for theme-aware barcodes
 - Auto EC upgrade to H when QR logo is present (supports PNG, JPEG, SVG, ICO)
-- GS1 support (100+ AIs, Digital Link, GS1 DataMatrix, GS1 DataBar)
+- GS1 support (100+ AIs, Digital Link, GS1 QR, GS1 DataMatrix, the full GS1
+  DataBar family including the stacked variants)
+- ECI on QR, Data Matrix, PDF417 and Aztec — non-Latin-1 data is declared, not
+  truncated
+- QR kanji mode with the real Shift-JIS table, Structured Append across up to
+  16 symbols, and optimal multi-segment encoding
+- Batch generation and label sheets (`barcodes()`, `qrcodeSheet()`)
 - HIBC medical device encoding + ISBT 128 blood bank labeling
 - Swiss QR-bill payments
 - 4-state postal barcodes (RM4SCC, KIX, Australia Post, Japan Post, USPS IMb)
 - Works in browser, Node.js, Deno, Bun, Cloudflare Workers
+
+## Verification
+
+Producing a symbol is easy; producing one a scanner accepts is not. Every
+symbology here is checked against something that is not this library:
+
+- **Decoded back** with [zxing-wasm](https://github.com/Sec-ant/zxing-wasm) or
+  jsQR — QR, Micro QR, rMQR, Data Matrix, PDF417, MicroPDF417, Aztec, MaxiCode,
+  Code 128, EAN, UPC, Code 39, Code 93, ITF, Codabar, GS1-128 and every GS1
+  DataBar variant.
+- **Compared module for module** with [bwip-js](https://github.com/metafloor/bwip-js)
+  (BWIPP) for the formats no JavaScript decoder implements — Code 16K,
+  Codablock F, DotCode, Han Xin, MSI, Plessey, Code 11, Pharmacode, Identcode,
+  Leitcode, HIBC, POSTNET, PLANET, RM4SCC, KIX, Australia Post, Japan Post and
+  USPS IMb.
+- **JAB Code is the exception**, and says so in its own API docs: no JavaScript
+  or WebAssembly decoder exists and neither zxing nor BWIPP implements it, so
+  its output cannot be verified and is marked experimental.
+
+`test/bwip-compare.test.ts` keeps the differences visible rather than asserting
+them away: a format that diverges is listed with the issue tracking it, and the
+test turns red the moment it starts matching.
 
 ## Comparison
 
