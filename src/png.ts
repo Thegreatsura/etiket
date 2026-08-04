@@ -44,6 +44,8 @@ export {
   code16kPNGDataURI,
   jabcodePNG,
   jabcodePNGDataURI,
+  gs1compositePNG,
+  gs1compositePNGDataURI,
   maxicodePNG,
   maxicodePNGDataURI,
 } from "./_png"

@@ -43,8 +43,14 @@ export { renderBarcodeSVG } from "./renderers/svg/barcode"
 export { svgToDataURI, svgToBase64 } from "./renderers/data-uri"
 
 // Industry encoders that build on the linear symbologies
-export { encodeGS1Composite } from "./encoders/gs1-composite"
-export type { CompositeType, GS1CompositeResult } from "./encoders/gs1-composite"
+export { encodeGS1Composite, encodeGS1CompositeSymbol } from "./encoders/gs1-composite"
+export type {
+  CompositeType,
+  CompositeLinearType,
+  GS1CompositeOptions,
+  GS1CompositeResult,
+  GS1CompositeSymbolResult,
+} from "./encoders/gs1-composite"
 export { encodeHIBCPrimary, encodeHIBCSecondary, encodeHIBCConcatenated } from "./encoders/hibc"
 export {
   encodeISBT128DIN,

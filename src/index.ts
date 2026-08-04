@@ -27,6 +27,7 @@ export {
   codablockf,
   code16k,
   jabcode,
+  gs1composite,
   gs1databarStacked,
   gs1databarStackedOmni,
   gs1databarExpandedStacked,
@@ -99,8 +100,14 @@ export { encodeGS1128 } from "./encoders/gs1-128"
 export { encodeIdentcode, encodeLeitcode } from "./encoders/deutsche-post"
 export { encodePOSTNET, encodePLANET } from "./encoders/postnet"
 export { encodePlessey } from "./encoders/plessey"
-export { encodeGS1Composite } from "./encoders/gs1-composite"
-export type { CompositeType, GS1CompositeResult } from "./encoders/gs1-composite"
+export { encodeGS1Composite, encodeGS1CompositeSymbol } from "./encoders/gs1-composite"
+export type {
+  CompositeType,
+  CompositeLinearType,
+  GS1CompositeOptions,
+  GS1CompositeResult,
+  GS1CompositeSymbolResult,
+} from "./encoders/gs1-composite"
 export {
   encodeGS1DataBarOmni,
   encodeGS1DataBarLimited,
@@ -190,6 +197,8 @@ export {
   code16kPNGDataURI,
   jabcodePNG,
   jabcodePNGDataURI,
+  gs1compositePNG,
+  gs1compositePNGDataURI,
   maxicodePNG,
   maxicodePNGDataURI,
 } from "./_png"

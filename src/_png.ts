@@ -26,6 +26,8 @@ import {
 } from "./encoders/gs1-databar"
 import { encodeMaxiCode } from "./encoders/maxicode"
 import { encodeJABCode } from "./encoders/jabcode"
+import { encodeGS1CompositeSymbol } from "./encoders/gs1-composite"
+import type { CompositeLinearType, GS1CompositeOptions } from "./encoders/gs1-composite"
 import {
   renderBarcodePNG,
   renderColorMatrixPNG,
@@ -426,4 +428,34 @@ export function jabcodePNGDataURI(
   options?: { colors?: 4 | 8; ecPercent?: number } & ColorMatrixPNGOptions,
 ): string {
   return toPNGDataURI(jabcodePNG(text, options))
+}
+
+/**
+ * Generate a complete GS1 Composite symbol as PNG.
+ *
+ * @param linearType - The primary symbology carrying the item identifier
+ * @param data - `"<linear data>|<composite data>"`
+ */
+export function gs1compositePNG(
+  linearType: CompositeLinearType,
+  data: string,
+  options?: GS1CompositeOptions & MatrixPNGOptions,
+): Uint8Array {
+  const { type, columns, linear, linearWidth, ...pngOpts } = options ?? {}
+  const result = encodeGS1CompositeSymbol(linearType, data, {
+    type,
+    columns,
+    linear,
+    linearWidth,
+  })
+  return renderMatrixPNG(result.matrix, { ...pngOpts, rowHeights: result.rowHeights })
+}
+
+/** Generate a complete GS1 Composite symbol as a PNG data URI */
+export function gs1compositePNGDataURI(
+  linearType: CompositeLinearType,
+  data: string,
+  options?: GS1CompositeOptions & MatrixPNGOptions,
+): string {
+  return toPNGDataURI(gs1compositePNG(linearType, data, options))
 }

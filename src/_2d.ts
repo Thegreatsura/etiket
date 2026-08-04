@@ -16,6 +16,8 @@ import { encodeHanXin } from "./encoders/hanxin"
 import { encodeCodablockF } from "./encoders/codablock-f"
 import { encodeCode16K } from "./encoders/code16k"
 import { encodeJABCode } from "./encoders/jabcode"
+import { encodeGS1CompositeSymbol } from "./encoders/gs1-composite"
+import type { CompositeLinearType, GS1CompositeOptions } from "./encoders/gs1-composite"
 import {
   encodeGS1DataBarStacked,
   encodeGS1DataBarStackedOmni,
@@ -189,6 +191,33 @@ export function code16k(text: string, options: MatrixSVGOptions = {}): string {
     ...options,
     rowHeights: stackedRowHeights(result, options.rowHeight ?? 8),
   })
+}
+
+/**
+ * Generate a complete GS1 Composite symbol as SVG — the 2D component, the
+ * separator pattern and the linear component with its linkage flag set.
+ *
+ * @param linearType - The primary symbology carrying the item identifier
+ * @param data - `"<linear data>|<composite data>"`
+ *
+ * @example
+ * ```ts
+ * const svg = gs1composite("databar-omni", "0101234567890128|(17)260101(10)LOT42")
+ * ```
+ */
+export function gs1composite(
+  linearType: CompositeLinearType,
+  data: string,
+  options: GS1CompositeOptions & MatrixSVGOptions = {},
+): string {
+  const { type, columns, linear, linearWidth, ...svgOpts } = options
+  const result = encodeGS1CompositeSymbol(linearType, data, {
+    type,
+    columns,
+    linear,
+    linearWidth,
+  })
+  return renderMatrixSVG(result.matrix, { ...svgOpts, rowHeights: result.rowHeights })
 }
 
 /**
