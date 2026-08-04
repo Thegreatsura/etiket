@@ -34,3 +34,31 @@ export {
   encodeGS1DataBarExpanded,
 } from "./encoders/gs1-databar"
 export { renderBarcodeSVG } from "./renderers/svg/barcode"
+export { svgToDataURI, svgToBase64 } from "./renderers/data-uri"
+
+// Industry encoders that build on the linear symbologies
+export { encodeGS1Composite } from "./encoders/gs1-composite"
+export type { CompositeType, GS1CompositeResult } from "./encoders/gs1-composite"
+export { encodeHIBCPrimary, encodeHIBCSecondary, encodeHIBCConcatenated } from "./encoders/hibc"
+export {
+  encodeISBT128DIN,
+  encodeISBT128Component,
+  encodeISBT128Expiry,
+  encodeISBT128BloodGroup,
+  iso7064Mod37_2,
+} from "./encoders/isbt128"
+
+// PNG output
+export { barcodePNG, barcodePNGDataURI } from "./_png"
+export type { BarcodePNGOptions } from "./renderers/png/types"
+
+// Validation and errors, so a barcode-only consumer can gate input and catch
+// failures without importing the full entry
+export {
+  validateBarcode,
+  isValidInput,
+  validateBarcodeInput,
+  calculateEANCheckDigit,
+  verifyEANCheckDigit,
+} from "./validators/barcode"
+export { EtiketError, InvalidInputError, CapacityError, CheckDigitError } from "./errors"

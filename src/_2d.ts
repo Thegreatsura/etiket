@@ -24,17 +24,21 @@ import type { RMQROptions } from "./encoders/rmqr"
 import type { MaxiCodeOptions } from "./encoders/maxicode"
 import type { HanXinOptions } from "./encoders/hanxin"
 import type { MicroPDF417Options } from "./encoders/micropdf417"
+import type { PDF417Options } from "./encoders/pdf417/index"
+import type { AztecOptions } from "./encoders/aztec/index"
+import type { JABCodeOptions } from "./encoders/jabcode"
 import type { DataMatrixSizeOptions } from "./encoders/datamatrix/tables"
+import type { DataMatrixEncodeOptions } from "./encoders/datamatrix/encoder"
 
 /**
  * Generate a Data Matrix as SVG string
  */
 export function datamatrix(
   text: string,
-  options?: DataMatrixSizeOptions & MatrixSVGOptions,
+  options?: DataMatrixSizeOptions & DataMatrixEncodeOptions & MatrixSVGOptions,
 ): string {
-  const { shape, dmre, symbolSize, ...svgOpts } = options ?? {}
-  const matrix = encodeDataMatrix(text, { shape, dmre, symbolSize })
+  const { shape, dmre, symbolSize, eci, ...svgOpts } = options ?? {}
+  const matrix = encodeDataMatrix(text, { shape, dmre, symbolSize, eci })
   return renderMatrixSVG(matrix, svgOpts)
 }
 
@@ -50,37 +54,29 @@ export function gs1datamatrix(
   return renderMatrixSVG(matrix, svgOpts)
 }
 
+/** Options accepted by {@link pdf417} */
+export interface PDF417SVGOptions extends PDF417Options, MatrixSVGOptions {
+  /** Overall symbol width in pixels; defaults to 400 */
+  width?: number
+  /** Overall symbol height in pixels */
+  height?: number
+}
+
 /**
  * Generate a PDF417 barcode as SVG string
  */
-export function pdf417(
-  text: string,
-  options?: {
-    ecLevel?: number
-    columns?: number
-    compact?: boolean
-    width?: number
-    height?: number
-  } & MatrixSVGOptions,
-): string {
-  const { ecLevel, columns, compact, ...svgOpts } = options ?? {}
-  const result = encodePDF417(text, { ecLevel, columns, compact })
+export function pdf417(text: string, options?: PDF417SVGOptions): string {
+  const { ecLevel, columns, compact, eci, ...svgOpts } = options ?? {}
+  const result = encodePDF417(text, { ecLevel, columns, compact, eci })
   return renderMatrixSVG(result.matrix, { size: svgOpts.width ?? 400, ...svgOpts })
 }
 
 /**
  * Generate an Aztec Code as SVG string
  */
-export function aztec(
-  text: string,
-  options?: {
-    ecPercent?: number
-    layers?: number
-    compact?: boolean
-  } & MatrixSVGOptions,
-): string {
-  const { ecPercent, layers, compact, ...svgOpts } = options ?? {}
-  const matrix = encodeAztec(text, { ecPercent, layers, compact })
+export function aztec(text: string, options?: AztecOptions & MatrixSVGOptions): string {
+  const { ecPercent, layers, compact, eci, ...svgOpts } = options ?? {}
+  const matrix = encodeAztec(text, { ecPercent, layers, compact, eci })
   return renderMatrixSVG(matrix, { margin: 0, ...svgOpts })
 }
 
@@ -145,13 +141,16 @@ export function micropdf417(
   return renderMatrixSVG(result.matrix, { rowHeight: 2, ...svgOpts })
 }
 
+/** Options accepted by {@link codablockf} */
+export interface CodablockFSVGOptions extends MatrixSVGOptions {
+  /** Number of data columns per row */
+  columns?: number
+}
+
 /**
  * Generate a Codablock-F stacked barcode as SVG string
  */
-export function codablockf(
-  text: string,
-  options: { columns?: number } & MatrixSVGOptions = {},
-): string {
+export function codablockf(text: string, options: CodablockFSVGOptions = {}): string {
   const { columns, ...svgOpts } = options
   const result = encodeCodablockF(text, { columns })
   return renderMatrixSVG(result.matrix, { rowHeight: 8, ...svgOpts })
@@ -170,7 +169,7 @@ export function code16k(text: string, options: MatrixSVGOptions = {}): string {
  */
 export function jabcode(
   text: string,
-  options: { colors?: 4 | 8; ecPercent?: number } & ColorMatrixSVGOptions = {},
+  options: JABCodeOptions & ColorMatrixSVGOptions = {},
 ): string {
   const { colors, ecPercent, ...svgOpts } = options
   const result = encodeJABCode(text, { colors, ecPercent })

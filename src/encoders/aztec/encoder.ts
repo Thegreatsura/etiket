@@ -6,6 +6,11 @@
  *
  * The encoder starts in Upper mode and switches between modes using
  * latch (permanent) and shift (single character) transitions as needed.
+ *
+ * Character sets other than ISO-8859-1 are declared with the FLG(n) escape
+ * (ISO/IEC 24778 §7.3.2): an ECI assignment number introduced from
+ * Punctuation mode. Input that ISO-8859-1 cannot represent is encoded as
+ * UTF-8 bytes under an automatic ECI 000026 declaration.
  */
 
 import { InvalidInputError } from "../../errors"
@@ -27,6 +32,64 @@ import {
 function pushBits(bits: number[], value: number, count: number): void {
   for (let i = count - 1; i >= 0; i--) {
     bits.push((value >> i) & 1)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// ECI / FLG(n)
+// ---------------------------------------------------------------------------
+
+/** ECI assignment number for UTF-8 */
+const ECI_UTF8 = 26
+
+/** Punctuation-mode codeword 0 is the FLG(n) escape */
+const FLG_CODE = 0
+
+/** Highest ECI number expressible in the 6 digits FLG(n) allows */
+const MAX_ECI = 999_999
+
+/** True when the string contains a character ISO-8859-1 cannot represent */
+function hasNonLatin1(text: string): boolean {
+  for (let i = 0; i < text.length; i++) {
+    if (text.charCodeAt(i) > 255) return true
+  }
+  return false
+}
+
+/** Re-encode a string as its UTF-8 bytes, one byte per char code */
+function toUtf8ByteString(text: string): string {
+  const bytes = new TextEncoder().encode(text)
+  let result = ""
+  for (let i = 0; i < bytes.length; i++) {
+    result += String.fromCharCode(bytes[i]!)
+  }
+  return result
+}
+
+/**
+ * Emit an ECI declaration as FLG(n) while in Upper mode.
+ *
+ * Layout (ISO/IEC 24778 §7.3.2):
+ *   P/S               — 5 bits, shift from Upper into Punctuation mode
+ *   FLG               — 5 bits, Punctuation codeword 0
+ *   n                 — 3 bits, the number of ECI digits that follow (1-6)
+ *   n x digit         — 4 bits each, Digit-mode codewords ('0' = 2 ... '9' = 11)
+ *
+ * The shift is transient, so the encoder is back in Upper mode afterwards.
+ * FLG(0) is FNC1 and is not emitted here.
+ */
+function emitECI(bits: number[], eci: number): void {
+  if (!Number.isInteger(eci) || eci < 0 || eci > MAX_ECI) {
+    throw new InvalidInputError(`Aztec Code: ECI must be an integer between 0 and ${MAX_ECI}`)
+  }
+
+  const digits = String(eci)
+
+  pushBits(bits, SHIFT_TO_PUNCT[Mode.Upper]!, MODE_BITS[Mode.Upper])
+  pushBits(bits, FLG_CODE, MODE_BITS[Mode.Punct])
+  pushBits(bits, digits.length, 3)
+  for (let i = 0; i < digits.length; i++) {
+    pushBits(bits, digits.charCodeAt(i) - 48 + 2, MODE_BITS[Mode.Digit])
   }
 }
 
@@ -63,25 +126,41 @@ function charModes(char: string): Array<{ mode: Mode; value: number }> {
  * 3. If no, try a shift first (cheaper for single characters), else latch.
  * 4. Fall back to binary shift for characters not in any text mode.
  *
- * @param text - The input text (ASCII/Latin-1)
+ * Input containing characters outside ISO-8859-1 is transparently re-encoded
+ * as UTF-8 bytes and prefixed with an FLG(n) ECI 000026 declaration, unless
+ * the caller declared a character set of its own.
+ *
+ * @param text - The input text
+ * @param eci - Optional ECI assignment number to declare (0-999999)
  * @returns Array of bits (0/1 values)
  */
-export function encodeHighLevel(text: string): number[] {
+export function encodeHighLevel(text: string, eci?: number): number[] {
   if (text.length === 0) {
     return []
   }
 
+  // Non-Latin-1 input travels as UTF-8 bytes under an ECI declaration
+  let data = text
+  let eciValue = eci
+  if (hasNonLatin1(text)) {
+    data = toUtf8ByteString(text)
+    eciValue ??= ECI_UTF8
+  }
+
   const bits: number[] = []
+  if (eciValue !== undefined) {
+    emitECI(bits, eciValue)
+  }
+
   let currentMode = Mode.Upper
   let i = 0
 
-  while (i < text.length) {
-    const char = text[i]!
-    const charCode = text.charCodeAt(i)
+  while (i < data.length) {
+    const char = data[i]!
 
     // --- Check for two-character punctuation pairs ---
-    if (i + 1 < text.length) {
-      const pair = text[i]! + text[i + 1]!
+    if (i + 1 < data.length) {
+      const pair = data[i]! + data[i + 1]!
       const punctPairVal = PUNCT_PAIRS.get(pair)
       if (punctPairVal !== undefined) {
         if (currentMode === Mode.Punct) {
@@ -120,7 +199,7 @@ export function encodeHighLevel(text: string): number[] {
 
     if (options.length > 0) {
       // Determine: should we shift or latch?
-      const bestOption = selectBestTransition(currentMode, options, text, i)
+      const bestOption = selectBestTransition(currentMode, options, data, i)
 
       if (bestOption.shift) {
         // Emit shift code, then character in the shifted mode
@@ -153,31 +232,21 @@ export function encodeHighLevel(text: string): number[] {
     }
 
     // --- Character not in any text mode — use binary shift ---
-    if (charCode > 255) {
-      throw new InvalidInputError(
-        `Aztec Code does not support character: "${char}" (U+${charCode.toString(16).padStart(4, "0")})`,
-      )
-    }
-
-    // Collect consecutive bytes that require binary encoding
+    // `data` is always Latin-1 here: anything wider was converted to UTF-8
+    // bytes above, so every remaining char code fits in 8 bits.
     const binaryStart = i
-    while (i < text.length) {
-      const c = text[i]!
+    while (i < data.length) {
+      const c = data[i]!
       if (charModes(c).length > 0) {
         // Check if it's only in a mode far from current — might be cheaper to stay binary
         // For simplicity, break out and let the text encoder handle it
         break
       }
-      if (text.charCodeAt(i) > 255) {
-        throw new InvalidInputError(
-          `Aztec Code does not support character: "${text[i]}" (U+${text.charCodeAt(i).toString(16).padStart(4, "0")})`,
-        )
-      }
       i++
     }
 
     const binaryLen = i - binaryStart
-    emitBinaryShift(bits, text, binaryStart, binaryLen, currentMode)
+    emitBinaryShift(bits, data, binaryStart, binaryLen, currentMode)
     continue
   }
 

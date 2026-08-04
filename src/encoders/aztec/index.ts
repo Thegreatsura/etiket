@@ -29,12 +29,22 @@ export interface AztecOptions {
   layers?: number
   /** Force compact mode (true) or full-range mode (false) */
   compact?: boolean
+  /**
+   * ECI assignment number to declare via FLG(n) (0-999999).
+   *
+   * Omit it and the encoder stays byte-transparent for ISO-8859-1 input,
+   * declaring ECI 000026 (UTF-8) automatically only when the text needs it.
+   */
+  eci?: number
 }
 
 /**
  * Encode text as an Aztec Code matrix.
  *
- * @param text - The text to encode (ASCII/Latin-1)
+ * Text outside ISO-8859-1 is encoded as UTF-8 bytes under an automatic
+ * ECI 000026 declaration; `options.eci` declares a character set explicitly.
+ *
+ * @param text - The text to encode
  * @param options - Encoding options
  * @returns 2D boolean array where `true` = dark module
  */
@@ -46,7 +56,7 @@ export function encodeAztec(text: string, options: AztecOptions = {}): boolean[]
   const ecPercent = options.ecPercent ?? 23
 
   // Step 1: Encode text into a bit stream
-  const dataBits = encodeHighLevel(text)
+  const dataBits = encodeHighLevel(text, options.eci)
 
   // Step 2: Compute minimum EC bits
   const eccBits = Math.floor((dataBits.length * ecPercent) / 100) + 11

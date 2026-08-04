@@ -6,6 +6,9 @@ import { encodeBars } from "./_barcode"
 import { encodeQR } from "./encoders/qr/index"
 import { encodeDataMatrix, encodeGS1DataMatrix } from "./encoders/datamatrix/index"
 import type { DataMatrixSizeOptions } from "./encoders/datamatrix/tables"
+import type { DataMatrixEncodeOptions } from "./encoders/datamatrix/encoder"
+import type { PDF417Options } from "./encoders/pdf417/index"
+import type { AztecOptions } from "./encoders/aztec/index"
 import { encodePDF417 } from "./encoders/pdf417/index"
 import { encodeAztec } from "./encoders/aztec/index"
 import { encodeMicroQR } from "./encoders/qr/micro"
@@ -107,10 +110,10 @@ export function qrcodePNGDataURI(text: string, options?: QRCodeOptions & MatrixP
  */
 export function datamatrixPNG(
   text: string,
-  options?: DataMatrixSizeOptions & MatrixPNGOptions,
+  options?: DataMatrixSizeOptions & DataMatrixEncodeOptions & MatrixPNGOptions,
 ): Uint8Array {
-  const { shape, dmre, symbolSize, ...pngOpts } = options ?? {}
-  const matrix = encodeDataMatrix(text, { shape, dmre, symbolSize })
+  const { shape, dmre, symbolSize, eci, ...pngOpts } = options ?? {}
+  const matrix = encodeDataMatrix(text, { shape, dmre, symbolSize, eci })
   return renderMatrixPNG(matrix, pngOpts)
 }
 
@@ -119,7 +122,7 @@ export function datamatrixPNG(
  */
 export function datamatrixPNGDataURI(
   text: string,
-  options?: DataMatrixSizeOptions & MatrixPNGOptions,
+  options?: DataMatrixSizeOptions & DataMatrixEncodeOptions & MatrixPNGOptions,
 ): string {
   return toPNGDataURI(datamatrixPNG(text, options))
 }
@@ -149,44 +152,32 @@ export function gs1datamatrixPNGDataURI(
 /**
  * Generate a PDF417 barcode as PNG
  */
-export function pdf417PNG(
-  text: string,
-  options?: { ecLevel?: number; columns?: number; compact?: boolean } & MatrixPNGOptions,
-): Uint8Array {
-  const { ecLevel, columns, compact, ...pngOpts } = options ?? {}
-  const result = encodePDF417(text, { ecLevel, columns, compact })
+export function pdf417PNG(text: string, options?: PDF417Options & MatrixPNGOptions): Uint8Array {
+  const { ecLevel, columns, compact, eci, ...pngOpts } = options ?? {}
+  const result = encodePDF417(text, { ecLevel, columns, compact, eci })
   return renderMatrixPNG(result.matrix, pngOpts)
 }
 
 /**
  * Generate a PDF417 barcode as PNG data URI
  */
-export function pdf417PNGDataURI(
-  text: string,
-  options?: { ecLevel?: number; columns?: number; compact?: boolean } & MatrixPNGOptions,
-): string {
+export function pdf417PNGDataURI(text: string, options?: PDF417Options & MatrixPNGOptions): string {
   return toPNGDataURI(pdf417PNG(text, options))
 }
 
 /**
  * Generate an Aztec Code as PNG
  */
-export function aztecPNG(
-  text: string,
-  options?: { ecPercent?: number; layers?: number; compact?: boolean } & MatrixPNGOptions,
-): Uint8Array {
-  const { ecPercent, layers, compact, ...pngOpts } = options ?? {}
-  const matrix = encodeAztec(text, { ecPercent, layers, compact })
+export function aztecPNG(text: string, options?: AztecOptions & MatrixPNGOptions): Uint8Array {
+  const { ecPercent, layers, compact, eci, ...pngOpts } = options ?? {}
+  const matrix = encodeAztec(text, { ecPercent, layers, compact, eci })
   return renderMatrixPNG(matrix, { margin: 0, ...pngOpts })
 }
 
 /**
  * Generate an Aztec Code as PNG data URI
  */
-export function aztecPNGDataURI(
-  text: string,
-  options?: { ecPercent?: number; layers?: number; compact?: boolean } & MatrixPNGOptions,
-): string {
+export function aztecPNGDataURI(text: string, options?: AztecOptions & MatrixPNGOptions): string {
   return toPNGDataURI(aztecPNG(text, options))
 }
 

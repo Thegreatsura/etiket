@@ -383,6 +383,7 @@ const datamatrixCommand = defineCommand({
       type: "string",
       description: 'Force an exact symbol size, e.g. "26x64"',
     },
+    eci: { type: "string", description: "ECI assignment number, e.g. 26 for UTF-8" },
   },
   run({ args }) {
     const values = args as unknown as MatrixArgValues & {
@@ -401,6 +402,7 @@ const datamatrixCommand = defineCommand({
       shape,
       dmre: values.dmre,
       symbolSize: values["symbol-size"],
+      eci: args.eci ? Number(args.eci) : undefined,
     }
     if (wantsPNG(values)) {
       const png = args.gs1 ? gs1datamatrixPNG : datamatrixPNG
@@ -420,6 +422,7 @@ const pdf417Command = defineCommand({
     "ec-level": { type: "string", description: "Error correction level 0-8" },
     columns: { type: "string", description: "Number of data columns" },
     compact: { type: "boolean", description: "Use compact mode" },
+    eci: { type: "string", description: "ECI assignment number, e.g. 26 for UTF-8" },
   },
   run({ args }) {
     const values = args as unknown as MatrixArgValues & { text: string }
@@ -427,6 +430,7 @@ const pdf417Command = defineCommand({
       ecLevel: args["ec-level"] ? Number(args["ec-level"]) : undefined,
       columns: args.columns ? Number(args.columns) : undefined,
       compact: args.compact || undefined,
+      eci: args.eci ? Number(args.eci) : undefined,
     }
     if (wantsPNG(values)) {
       output(pdf417PNG(args.text, { ...encoding, ...pngMatrixOptions(values) }), values.output)
@@ -444,6 +448,7 @@ const aztecCommand = defineCommand({
     "ec-percent": { type: "string", description: "Error correction percentage" },
     layers: { type: "string", description: "Number of layers" },
     compact: { type: "boolean", description: "Use compact mode" },
+    eci: { type: "string", description: "ECI assignment number, e.g. 26 for UTF-8" },
   },
   run({ args }) {
     const values = args as unknown as MatrixArgValues & { text: string }
@@ -451,6 +456,7 @@ const aztecCommand = defineCommand({
       ecPercent: args["ec-percent"] ? Number(args["ec-percent"]) : undefined,
       layers: args.layers ? Number(args.layers) : undefined,
       compact: args.compact || undefined,
+      eci: args.eci ? Number(args.eci) : undefined,
     }
     if (wantsPNG(values)) {
       output(aztecPNG(args.text, { ...encoding, ...pngMatrixOptions(values) }), values.output)

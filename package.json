@@ -50,6 +50,7 @@
     "dist"
   ],
   "type": "module",
+  "sideEffects": false,
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "exports": {
@@ -81,10 +82,27 @@
       "types": "./dist/postal.d.mts",
       "default": "./dist/postal.mjs"
     },
+    "./2d": {
+      "types": "./dist/2d.d.mts",
+      "default": "./dist/2d.mjs"
+    },
     "./png": {
       "types": "./dist/png.d.mts",
       "default": "./dist/png.mjs"
-    }
+    },
+    "./errors": {
+      "types": "./dist/errors.d.mts",
+      "default": "./dist/errors.mjs"
+    },
+    "./validators": {
+      "types": "./dist/validators/index.d.mts",
+      "default": "./dist/validators/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "scripts": {
     "build": "obuild",
@@ -113,6 +131,9 @@
     "vitest": "^4.1.10",
     "zbar.wasm": "^2.1.1",
     "zxing-wasm": "^3.1.2"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "packageManager": "pnpm@11.20.0"
 }
