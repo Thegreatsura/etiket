@@ -289,28 +289,12 @@ describe("MaxiCode round-trip (zxing-wasm)", () => {
     expect(result?.format).toBe("MaxiCode")
   })
 
-  /**
-   * Expected divergence — issues #96 and #97.
-   *
-   * The finder, orientation and error correction are good enough for zxing to
-   * locate and decode the symbol, but the payload never survives:
-   *
-   *   "THIS IS A TEST"                       -> "Test{test"
-   *   "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" -> "TestABCdefghijklmnopqrstuvwxyz"
-   *   "A"                                    -> "Test"
-   *
-   * The nine data codewords carried in the primary message are lost in every mode
-   * (issue #96, which describes the mode 2/3 primary layout), and the remainder
-   * comes back in the wrong code set (issue #97). A bwip-js MaxiCode rendered and
-   * decoded through this same pipeline round-trips exactly, so the failure is in
-   * the encoder, not in the rasterizer above.
-   */
-  it.fails("round-trips mode 4 text (issues #96, #97)", async () => {
+  it("round-trips mode 4 text (issues #96, #97)", async () => {
     const result = await decodeMaxiCode(encodeMaxiCode("THIS IS A TEST"))
     expect(result?.text).toBe("THIS IS A TEST")
   })
 
-  it.fails("round-trips a mode 2 structured carrier message (issue #96)", async () => {
+  it("round-trips a mode 2 structured carrier message (issue #96)", async () => {
     const result = await decodeMaxiCode(
       encodeMaxiCode("TESTING", {
         mode: 2,
@@ -322,15 +306,16 @@ describe("MaxiCode round-trip (zxing-wasm)", () => {
     expect(result?.text).toContain("152382802")
   })
 
-  it.fails("round-trips a mode 3 structured carrier message (issue #96)", async () => {
+  it("round-trips a mode 3 structured carrier message (issue #96)", async () => {
     const result = await decodeMaxiCode(
       encodeMaxiCode("TESTING", {
         mode: 3,
-        postalCode: "AB1 2CD",
+        // Mode 3 postal codes are six Code Set A characters at most
+        postalCode: "AB12CD",
         countryCode: 826,
         serviceClass: 1,
       }),
     )
-    expect(result?.text).toContain("AB1 2CD")
+    expect(result?.text).toContain("AB12CD")
   })
 })
