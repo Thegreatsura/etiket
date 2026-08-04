@@ -14,6 +14,12 @@ import { getCodewordPattern, getRowCluster, START_PATTERN, STOP_PATTERN } from "
 export interface PDF417Options {
   /** Error correction level 0-8, default auto-selected based on data size */
   ecLevel?: number
+  /**
+   * ECI assignment number declaring the character set of the data.
+   * Left out, the encoder declares ECI 26 (UTF-8) by itself as soon as the
+   * input contains something ISO-8859-15 cannot represent.
+   */
+  eci?: number
   /** Number of data columns (1-30), auto-calculated if omitted */
   columns?: number
   /** Compact PDF417 (omits right row indicator) */
@@ -62,7 +68,7 @@ export function encodePDF417(text: string, options: PDF417Options = {}): PDF417R
   const compact = options.compact ?? false
 
   // Step 1: Encode text into data codewords
-  const dataCodewords = encodeData(text)
+  const dataCodewords = encodeData(text, { eci: options.eci })
 
   if (dataCodewords.length > MAX_DATA_CODEWORDS) {
     throw new CapacityError(
