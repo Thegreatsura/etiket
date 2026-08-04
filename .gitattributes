@@ -1,0 +1,15 @@
+# Check every text file out with LF, on every platform.
+#
+# Without this, git hands Windows CRLF line endings and oxfmt --check reports
+# every file in the repo as misformatted — which is exactly what the Windows CI
+# leg did before this file existed.
+* text=auto eol=lf
+
+# Binary assets keep their bytes
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
