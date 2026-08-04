@@ -3,7 +3,7 @@
  */
 
 import type { ErrorCorrectionLevel } from "../encoders/qr/types"
-import { selectVersion } from "../encoders/qr/version"
+import { planEncoding } from "../encoders/qr/data"
 import { detectMode } from "../encoders/qr/mode"
 
 /** Maximum data capacity by EC level and mode (version 40) */
@@ -60,10 +60,11 @@ export function validateQRInput(
     }
   }
 
-  // Use selectVersion to find the minimum QR version
+  // Plan the encoding exactly as the encoder would, so the reported version is
+  // the version the caller will actually get — including multi-segment splits
   let version: number
   try {
-    version = selectVersion(text, ecLevel)
+    version = planEncoding(text, ecLevel, {}).version
   } catch {
     return {
       valid: false,

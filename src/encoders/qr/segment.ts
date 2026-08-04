@@ -1,13 +1,17 @@
 /**
  * Optimal segment mode switching for QR codes
  *
- * Determines whether to switch encoding modes or keep the current mode
- * based on the overhead of mode switching vs. the savings from using
- * a more efficient mode.
+ * Finds the cheapest way to split the input across numeric, alphanumeric and
+ * byte segments. A shorter segment is not automatically better: every switch
+ * costs a 4-bit mode indicator plus a version-dependent character count, so a
+ * short numeric run inside alphanumeric text is cheaper left where it is.
  *
- * The key insight: switching modes costs 4 bits (mode indicator) + N bits
- * (character count indicator). If the savings from the new mode don't
- * exceed this overhead, it's better to stay in the current mode.
+ * The search is a dynamic program over the three modes. Costs are tracked in
+ * sixths of a bit so that the fractional per-character costs stay exact:
+ * numeric is 10 bits per 3 characters (20 sixths each), alphanumeric 11 bits
+ * per 2 characters (33 sixths each) and byte 8 bits per byte (48 sixths). A
+ * partially filled group is only paid for once the segment ends, so the
+ * running cost is rounded up to a whole bit at each mode switch.
  */
 
 import type { QRSegment } from "./types"
@@ -15,97 +19,128 @@ import { getCharCountBits, ALPHANUMERIC_CHARS } from "./tables"
 
 type Mode = "numeric" | "alphanumeric" | "byte"
 
-/** Bits per character in each mode */
-function bitsPerChar(mode: Mode): number {
+const MODES: readonly Mode[] = ["numeric", "alphanumeric", "byte"]
+const NUMERIC = 0
+const ALPHANUMERIC = 1
+const BYTE = 2
+
+/** UTF-8 byte length of a single code point */
+function utf8Length(char: string): number {
+  const code = char.codePointAt(0)!
+  if (code < 0x80) return 1
+  if (code < 0x800) return 2
+  if (code < 0x10000) return 3
+  return 4
+}
+
+function isDigit(char: string): boolean {
+  return char >= "0" && char <= "9"
+}
+
+function isAlphanumeric(char: string): boolean {
+  return ALPHANUMERIC_CHARS.includes(char)
+}
+
+/** Cost of one character in a mode, in sixths of a bit; Infinity if unusable */
+function charCost(char: string, mode: number): number {
   switch (mode) {
-    case "numeric":
-      return 10 / 3 // ~3.33 bits per digit
-    case "alphanumeric":
-      return 11 / 2 // 5.5 bits per char
-    case "byte":
-      return 8
+    case NUMERIC:
+      return isDigit(char) ? 20 : Infinity
+    case ALPHANUMERIC:
+      return isAlphanumeric(char) ? 33 : Infinity
+    default:
+      return utf8Length(char) * 48
   }
 }
 
-/** Mode switch cost: 4 bits (mode indicator) + character count bits */
-function switchCost(version: number, targetMode: Mode): number {
-  return 4 + getCharCountBits(version, targetMode)
-}
-
-/** Detect the most efficient mode for a single character */
-function charMode(char: string): Mode {
-  if (char >= "0" && char <= "9") return "numeric"
-  if (ALPHANUMERIC_CHARS.includes(char)) return "alphanumeric"
-  return "byte"
+/** Round a sixths-of-a-bit cost up to a whole bit */
+function roundToBit(cost: number): number {
+  return Math.ceil(cost / 6) * 6
 }
 
 /**
- * Split text into optimized segments that minimize total encoded bit length.
+ * Split text into segments that minimise the total encoded bit length.
  *
- * Uses a greedy look-ahead approach:
- * 1. Start in the most efficient mode for the first character
- * 2. At each mode boundary, look ahead to see how long the new mode run is
- * 3. If the savings from switching exceed the switch cost, switch
- * 4. Otherwise, stay in the current (less efficient but cheaper) mode
+ * @param text - The text to segment
+ * @param version - Target QR version; it sets the character-count width and
+ *   therefore how expensive a mode switch is
  */
 export function optimizeSegments(text: string, version: number): QRSegment[] {
-  if (text.length === 0) return []
+  const chars = [...text]
+  if (chars.length === 0) return []
 
-  const segments: QRSegment[] = []
-  let currentMode: Mode = charMode(text[0]!)
-  let segStart = 0
+  const headCost = MODES.map((mode) => (4 + getCharCountBits(version, mode)) * 6)
 
-  let i = 1
-  while (i < text.length) {
-    const cm = charMode(text[i]!)
+  // charModes[i][m] = the mode character i-1 was in, on the cheapest path that
+  // puts character i in mode m
+  const charModes: number[][] = []
+  let prevCosts = headCost.slice()
 
-    if (cm === currentMode) {
-      i++
-      continue
+  for (const char of chars) {
+    const costs = [Infinity, Infinity, Infinity]
+    const from = [-1, -1, -1]
+
+    for (let mode = 0; mode < 3; mode++) {
+      const perChar = charCost(char, mode)
+      if (perChar === Infinity) continue
+
+      // Staying in the same mode
+      if (prevCosts[mode]! !== Infinity) {
+        costs[mode] = prevCosts[mode]! + perChar
+        from[mode] = mode
+      }
+
+      // Switching into this mode: the previous segment ends here, so its cost
+      // is rounded up to a whole bit before the new header is added
+      for (let previous = 0; previous < 3; previous++) {
+        if (previous === mode || prevCosts[previous]! === Infinity) continue
+        const switched = roundToBit(prevCosts[previous]!) + headCost[mode]! + perChar
+        if (switched < costs[mode]!) {
+          costs[mode] = switched
+          from[mode] = previous
+        }
+      }
     }
 
-    // Different mode detected — should we switch?
-    // Count how many consecutive chars are in the new mode
-    let runLen = 1
-    let j = i + 1
-    while (j < text.length && charMode(text[j]!) === cm) {
-      runLen++
-      j++
-    }
-
-    // Calculate: is switching cheaper than encoding in current mode?
-    const costInCurrent = runLen * bitsPerChar(currentMode)
-    const costInNew = switchCost(version, cm) + runLen * bitsPerChar(cm)
-
-    if (costInNew < costInCurrent) {
-      // Switch: flush current segment, start new one
-      pushSegment(segments, text, segStart, i, currentMode)
-      currentMode = cm
-      segStart = i
-    }
-    // Else: stay in current mode (absorb the chars)
-
-    i = j
+    charModes.push(from)
+    prevCosts = costs
   }
 
-  // Flush final segment
-  pushSegment(segments, text, segStart, text.length, currentMode)
+  // Cheapest terminal mode
+  let endMode = BYTE
+  for (let mode = 0; mode < 3; mode++) {
+    if (roundToBit(prevCosts[mode]!) < roundToBit(prevCosts[endMode]!)) endMode = mode
+  }
+
+  // Walk the choices backwards to label every character with its mode
+  const modeOfChar: number[] = Array.from({ length: chars.length })
+  let mode = endMode
+  for (let i = chars.length - 1; i >= 0; i--) {
+    modeOfChar[i] = mode
+    mode = charModes[i]![mode]!
+  }
+
+  return groupSegments(chars, modeOfChar)
+}
+
+/** Turn per-character modes into runs, then into segments */
+function groupSegments(chars: string[], modeOfChar: number[]): QRSegment[] {
+  const segments: QRSegment[] = []
+  let start = 0
+
+  for (let i = 1; i <= chars.length; i++) {
+    if (i < chars.length && modeOfChar[i] === modeOfChar[start]) continue
+    segments.push(makeSegment(chars.slice(start, i).join(""), modeOfChar[start]!))
+    start = i
+  }
 
   return segments
 }
 
-function pushSegment(
-  segments: QRSegment[],
-  text: string,
-  start: number,
-  end: number,
-  mode: Mode,
-): void {
-  const segText = text.substring(start, end)
-  const data = new TextEncoder().encode(segText)
-  segments.push({
-    mode,
-    data,
-    charCount: mode === "byte" ? data.length : segText.length,
-  })
+function makeSegment(text: string, mode: number): QRSegment {
+  if (mode === BYTE) {
+    const data = new TextEncoder().encode(text)
+    return { mode: "byte", data, charCount: data.length }
+  }
+  return { mode: MODES[mode]!, data: text, charCount: text.length }
 }
