@@ -72,11 +72,6 @@ import {
  * description of the divergence, both of which end up in the test title.
  */
 const DIVERGENT: Record<string, string> = {
-  "code128 (Code C switching)":
-    "#135 — etiket latches to Code C for 2-3 digit runs embedded in " +
-    "alphanumeric data, which BWIPP (and ISO/IEC 15417 Annex B) keeps in Code B; etiket " +
-    'emits one extra codeword for payloads such as "Test123" and "Hello World 123"',
-
   micropdf417:
     "#136 — symbol variant selection " +
     "differs: etiket picks 1x11 where BWIPP picks 1x14 for the same data; where both pick " +

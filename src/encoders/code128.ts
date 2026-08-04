@@ -188,10 +188,13 @@ function autoEncode(text: string): number[] {
   const codes: number[] = []
   let pos = 0
 
-  // Check if we should start with Code C (numeric pairs)
+  // Code C carries two digits per codeword, but reaching it costs a codeword.
+  // ISO/IEC 15417 Annex B: start in C for four or more leading digits (or for a
+  // two-digit payload, where C is a straight win), and switch into it later
+  // only for six or more, or four or more that run to the end of the data.
   const numericRun = countNumericFromPos(text, 0)
 
-  if (numericRun >= 4) {
+  if (numericRun >= 4 || (numericRun === 2 && text.length === 2)) {
     codes.push(START_C)
     pos = encodeCodeC(text, pos, codes)
   } else {
@@ -213,7 +216,11 @@ function autoEncode(text: string): number[] {
     } else {
       // In Code B (or A), check if switching to C is beneficial
       const numRun = countNumericFromPos(text, pos)
-      if (numRun >= 4 || (numRun >= 2 && pos + numRun >= text.length)) {
+      const runsToEnd = pos + numRun >= text.length
+      const worthSwitching = numRun >= 6 || (numRun >= 4 && runsToEnd)
+      // An odd run leaves a digit over; encoding that first keeps the Code C
+      // stretch even, which is what the reference implementation does
+      if (worthSwitching && numRun % 2 === 0) {
         codes.push(CODE_C)
         currentSet = "C"
         pos = encodeCodeC(text, pos, codes)
