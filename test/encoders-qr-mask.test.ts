@@ -110,12 +110,13 @@ describe("QR penalty evaluation", () => {
     expect(darkPenalty).toBeGreaterThan(checkPenalty)
   })
 
-  it("returns non-negative penalty", () => {
+  it("returns a non-negative penalty for an irregular matrix", () => {
+    // A fixed pseudo-random pattern: an unseeded Math.random() input cannot be
+    // reproduced when it does fail
     const size = 21
-    const matrix: (boolean | null)[][] = Array.from({ length: size }, () =>
-      Array.from({ length: size }, () => Math.random() > 0.5),
+    const matrix: (boolean | null)[][] = Array.from({ length: size }, (_, row) =>
+      Array.from({ length: size }, (_, col) => ((row * 7 + col * 13 + row * col) & 3) > 1),
     )
-    const penalty = evaluatePenalty(matrix, size)
-    expect(penalty).toBeGreaterThanOrEqual(0)
+    expect(evaluatePenalty(matrix, size)).toBeGreaterThanOrEqual(0)
   })
 })
