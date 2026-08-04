@@ -42,6 +42,8 @@ export {
   gs1databarExpandedStackedPNG,
   gs1databarExpandedStackedPNGDataURI,
   code16kPNGDataURI,
+  jabcodePNG,
+  jabcodePNGDataURI,
   maxicodePNG,
   maxicodePNGDataURI,
 } from "./_png"

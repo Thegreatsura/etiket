@@ -25,13 +25,16 @@ import {
   encodeGS1DataBarExpandedStacked,
 } from "./encoders/gs1-databar"
 import { encodeMaxiCode } from "./encoders/maxicode"
+import { encodeJABCode } from "./encoders/jabcode"
 import {
   renderBarcodePNG,
+  renderColorMatrixPNG,
   renderMatrixPNG,
   renderPostalPNG,
   renderMaxiCodePNG,
 } from "./renderers/png/rasterize"
 import { encodePostal } from "./_postal"
+import type { ColorMatrixPNGOptions } from "./renderers/png/types"
 import type { PostalEncodingOptions } from "./_postal"
 import type { BarcodeEncodingOptions } from "./_types"
 import type { QRCodeOptions } from "./encoders/qr/types"
@@ -393,4 +396,34 @@ export function gs1databarExpandedStackedPNGDataURI(
   options?: { segments?: number } & MatrixPNGOptions,
 ): string {
   return toPNGDataURI(gs1databarExpandedStackedPNG(text, options))
+}
+
+/**
+ * Generate a JAB Code as PNG.
+ *
+ * JAB Code is polychrome, so it goes through the true-colour PNG path rather
+ * than the two-colour one every other symbology uses.
+ *
+ * @experimental JAB Code output is not ISO/IEC 23634 conformant — see the
+ * caveat on {@link jabcode}.
+ */
+export function jabcodePNG(
+  text: string,
+  options?: { colors?: 4 | 8; ecPercent?: number } & ColorMatrixPNGOptions,
+): Uint8Array {
+  const { colors, ecPercent, ...pngOpts } = options ?? {}
+  const result = encodeJABCode(text, { colors, ecPercent })
+  return renderColorMatrixPNG(result.matrix, result.palette, pngOpts)
+}
+
+/**
+ * Generate a JAB Code as PNG data URI
+ *
+ * @experimental See {@link jabcodePNG}.
+ */
+export function jabcodePNGDataURI(
+  text: string,
+  options?: { colors?: 4 | 8; ecPercent?: number } & ColorMatrixPNGOptions,
+): string {
+  return toPNGDataURI(jabcodePNG(text, options))
 }

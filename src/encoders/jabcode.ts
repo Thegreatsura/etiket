@@ -1,15 +1,23 @@
 /**
- * JAB Code encoder (ISO/IEC 23634)
- * Polychrome (colored) 2D barcode — new ISO standard
+ * JAB Code — polychrome 2D symbol, 4 or 8 colours instead of black and white.
  *
- * Features:
- * - Uses 4 or 8 colors instead of black/white (2-3x capacity vs QR)
- * - Square matrix with finder patterns
- * - LDPC-like XOR-parity error correction
- * - Version 1-32
+ * @experimental **This encoder is not ISO/IEC 23634 conformant.** The error
+ * correction is an XOR parity scheme, not the standard's LDPC codes, and the
+ * metadata and finder patterns do not follow the specification either. Symbols
+ * are visually plausible and self-consistent, but no conforming reader will
+ * decode them.
  *
- * Note: JAB Code output is a color matrix, not boolean.
- * Each cell has a color index (0-3 for 4-color, 0-7 for 8-color).
+ * It stays in the library because there is no way to fix it responsibly: no
+ * JavaScript or WebAssembly JAB decoder exists, and neither zxing nor BWIPP
+ * implements the symbology, so a "corrected" implementation could not be
+ * verified against anything — which is how the previous encoders in this
+ * library ended up producing confident, unreadable output. Every other
+ * symbology here is checked against a real decoder or the reference
+ * implementation; this one cannot be, and says so.
+ *
+ * Output is a matrix of palette indices, not booleans: each cell carries 0-3
+ * for the 4-colour palette and 0-7 for the 8-colour one. That is also why
+ * `encode()` does not accept `"jabcode"` — its result type is a boolean matrix.
  */
 
 import { InvalidInputError, CapacityError } from "../errors"

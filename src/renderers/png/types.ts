@@ -77,3 +77,15 @@ export function parseHexColor(hex: string): [number, number, number] {
   }
   return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff]
 }
+
+/** Options for rendering a palette-indexed matrix, as JAB Code produces */
+export interface ColorMatrixPNGOptions {
+  /** Pixels per module (default: 10) */
+  moduleSize?: number
+  /** Quiet zone in modules (default: 4) */
+  margin?: number
+  /** Background colour as a hex string (default: "#ffffff") */
+  background?: string
+  /** Colour palette indexed by module value; overrides the encoder's palette */
+  palette?: readonly string[]
+}

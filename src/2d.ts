@@ -42,6 +42,8 @@ export {
   codablockfPNGDataURI,
   code16kPNG,
   code16kPNGDataURI,
+  jabcodePNG,
+  jabcodePNGDataURI,
 } from "./_png"
 
 export { renderMatrixSVG, renderMaxiCodeSVG } from "./renderers/svg/matrix"

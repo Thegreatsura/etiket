@@ -221,6 +221,9 @@ export function gs1databarExpandedStacked(
 
 /**
  * Generate a JAB Code (polychrome 2D symbol) as SVG string
+ *
+ * @experimental Not ISO/IEC 23634 conformant and unverifiable — see
+ * {@link encodeJABCode}.
  */
 export function jabcode(
   text: string,
