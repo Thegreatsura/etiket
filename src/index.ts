@@ -224,3 +224,7 @@ export {
 } from "./validators/barcode"
 export { validateQRInput } from "./validators/qr"
 export type { QRValidationResult } from "./validators/qr"
+
+// Batch generation and label sheets
+export { barcodes, qrcodes, barcodeSheet, qrcodeSheet } from "./_batch"
+export type { BatchOptions, SheetOptions, BarcodeSheetOptions, QRCodeSheetOptions } from "./_batch"

@@ -50,3 +50,7 @@ export type { MatrixPNGOptions } from "./renderers/png/types"
 export { validateQRInput } from "./validators/qr"
 export type { QRValidationResult } from "./validators/qr"
 export { EtiketError, InvalidInputError, CapacityError, CheckDigitError } from "./errors"
+
+// Batch generation and label sheets
+export { qrcodes, qrcodeSheet } from "./_batch"
+export type { BatchOptions, QRCodeSheetOptions, SheetOptions } from "./_batch"

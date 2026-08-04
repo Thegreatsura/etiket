@@ -67,3 +67,7 @@ export {
   verifyEANCheckDigit,
 } from "./validators/barcode"
 export { EtiketError, InvalidInputError, CapacityError, CheckDigitError } from "./errors"
+
+// Batch generation and label sheets
+export { barcodes, barcodeSheet } from "./_batch"
+export type { BatchOptions, BarcodeSheetOptions, SheetOptions } from "./_batch"
