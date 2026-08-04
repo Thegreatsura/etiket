@@ -1,3 +1,5 @@
+import { InvalidInputError } from "../../errors"
+
 /**
  * PDF417 codeword pattern tables and text compaction mappings
  * Based on ISO/IEC 15438
@@ -248,7 +250,7 @@ export function getCodewordPattern(codeword: number, cluster: number): number[] 
   const clusterIndex = cluster / 3
   const table = CLUSTERS[clusterIndex]!
   if (codeword < 0 || codeword >= table.length) {
-    throw new Error(
+    throw new InvalidInputError(
       "Codeword " +
         codeword +
         " out of range for cluster " +

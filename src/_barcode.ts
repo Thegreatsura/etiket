@@ -101,7 +101,7 @@ export function encodeBars(text: string, options: BarcodeEncodingOptions = {}): 
     case "gs1-databar-expanded":
       return encodeGS1DataBarExpanded(text)
     default:
-      throw new Error(`Unsupported barcode type: ${type}`)
+      throw new InvalidInputError(`Unsupported barcode type: ${type}`)
   }
 }
 

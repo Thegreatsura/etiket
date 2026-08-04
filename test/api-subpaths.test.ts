@@ -7,6 +7,7 @@
 
 import { describe, expect, it } from "vitest"
 import { readFileSync } from "node:fs"
+import { fileURLToPath } from "node:url"
 import * as main from "../src/index"
 import * as barcodeEntry from "../src/barcode"
 import * as qrEntry from "../src/qr"
@@ -19,7 +20,9 @@ import * as pngEntry from "../src/png"
 import * as errorsEntry from "../src/errors"
 import * as validatorsEntry from "../src/validators/index"
 
-const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
+const pkg = JSON.parse(
+  readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8"),
+) as {
   exports: Record<string, { types?: string; default?: string } | string>
 }
 

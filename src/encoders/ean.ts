@@ -2,7 +2,7 @@
  * EAN-13 and EAN-8 barcode encoder
  */
 
-import { InvalidInputError } from "../errors"
+import { InvalidInputError, CheckDigitError } from "../errors"
 
 // Encoding patterns for digits
 // L = left odd parity, G = left even parity, R = right
@@ -88,7 +88,7 @@ export function encodeEAN13(text: string): { bars: number[]; guards: number[] } 
   } else if (digits.length === 13) {
     const expected = calculateCheckDigit(digits.slice(0, 12))
     if (digits[12] !== expected) {
-      throw new InvalidInputError(
+      throw new CheckDigitError(
         `EAN-13 check digit mismatch: expected ${expected}, got ${digits[12]}`,
       )
     }
@@ -159,7 +159,7 @@ export function encodeEAN8(text: string): { bars: number[]; guards: number[] } {
   } else if (digits.length === 8) {
     const expected = calculateCheckDigit(digits.slice(0, 7))
     if (digits[7] !== expected) {
-      throw new InvalidInputError(
+      throw new CheckDigitError(
         `EAN-8 check digit mismatch: expected ${expected}, got ${digits[7]}`,
       )
     }

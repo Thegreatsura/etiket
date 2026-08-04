@@ -3,7 +3,7 @@
  * Based on Interleaved 2 of 5 with modulo 10 check digit (weights 4,9)
  */
 
-import { InvalidInputError } from "../errors"
+import { InvalidInputError, CheckDigitError } from "../errors"
 import { encodeITF } from "./itf"
 
 /**
@@ -38,7 +38,7 @@ export function encodeIdentcode(text: string): number[] {
     const expected = dpCheckDigit(digits.slice(0, 11))
     const provided = Number(digits[11])
     if (provided !== expected) {
-      throw new InvalidInputError(
+      throw new CheckDigitError(
         `Identcode check digit mismatch: expected ${expected}, got ${provided}`,
       )
     }
@@ -70,7 +70,7 @@ export function encodeLeitcode(text: string): number[] {
     const expected = dpCheckDigit(digits.slice(0, 13))
     const provided = Number(digits[13])
     if (provided !== expected) {
-      throw new InvalidInputError(
+      throw new CheckDigitError(
         `Leitcode check digit mismatch: expected ${expected}, got ${provided}`,
       )
     }

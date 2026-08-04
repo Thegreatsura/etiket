@@ -72,19 +72,10 @@ import {
  * description of the divergence, both of which end up in the test title.
  */
 const DIVERGENT: Record<string, string> = {
-  plessey:
-    "#134 — etiket uses a 2-module bit pitch (bar and space of equal width) " +
-    "where BWIPP uses a constant 5-module pitch (wide bar 3 + gap 2, narrow bar 1 + gap 4), " +
-    "plus a different start/stop; the symbol is 12 modules short and every element differs",
-
   "code128 (Code C switching)":
     "#135 — etiket latches to Code C for 2-3 digit runs embedded in " +
     "alphanumeric data, which BWIPP (and ISO/IEC 15417 Annex B) keeps in Code B; etiket " +
     'emits one extra codeword for payloads such as "Test123" and "Hello World 123"',
-
-  "australia-post":
-    "#133 — etiket always emits 28 bars regardless of the Format Control " +
-    "Code; BWIPP emits the specified 37 bars for FCC 11, 52 for FCC 59 and 67 for FCC 62",
 
   micropdf417:
     "#136 — symbol variant selection " +

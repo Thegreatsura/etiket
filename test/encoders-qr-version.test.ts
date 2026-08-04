@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest"
-import { selectVersion, getModuleCount, getDataCapacityBits } from "../src/encoders/qr/version"
+import { getModuleCount, getDataCapacityBits } from "../src/encoders/qr/version"
+import { planEncoding } from "../src/encoders/qr/data"
+import type { ErrorCorrectionLevel, EncodingMode } from "../src/encoders/qr/types"
+
+/** The encoder plans version and segmentation together; this is that decision. */
+function selectVersion(
+  text: string,
+  ecLevel: ErrorCorrectionLevel = "M",
+  mode?: EncodingMode,
+  version?: number,
+): number {
+  return planEncoding(text, ecLevel, { mode, version }).version
+}
 
 describe("QR version selection", () => {
   it("selects version 1 for short numeric text", () => {

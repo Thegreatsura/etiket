@@ -16,7 +16,7 @@ import {
   pushBits,
 } from "./mode"
 import { addErrorCorrection } from "./reed-solomon"
-import { CapacityError, InvalidInputError } from "../../errors"
+import { CapacityError, EtiketError, InvalidInputError } from "../../errors"
 
 export interface EncodedData {
   version: number
@@ -238,7 +238,7 @@ function appendHeaders(bits: number[], options: QRCodeOptions): void {
 function appendSegment(bits: number[], segment: QRSegment, version: number): void {
   const mode = segment.mode
   if (mode === "eci") {
-    throw new Error("ECI segments are not produced by this encoder")
+    throw new EtiketError("Internal: ECI segments are emitted as headers, not as data segments")
   }
 
   pushBits(bits, MODE_INDICATOR[mode], 4)

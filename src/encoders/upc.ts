@@ -2,7 +2,7 @@
  * UPC-A and UPC-E barcode encoder
  */
 
-import { InvalidInputError } from "../errors"
+import { InvalidInputError, CheckDigitError } from "../errors"
 
 // Encoding patterns for digits (same as EAN, duplicated to avoid inter-encoder dependencies)
 // L = left odd parity, G = left even parity, R = right
@@ -126,7 +126,7 @@ export function encodeUPCA(text: string): { bars: number[]; guards: number[] } {
   } else if (digits.length === 12) {
     const expected = calculateCheckDigit(digits.slice(0, 11))
     if (digits[11] !== expected) {
-      throw new InvalidInputError(
+      throw new CheckDigitError(
         `UPC-A check digit mismatch: expected ${expected}, got ${digits[11]}`,
       )
     }
@@ -223,7 +223,7 @@ export function encodeUPCE(text: string): { bars: number[]; guards: number[] } {
       checkDigit = calculateCheckDigit(expanded)
       const provided = raw[6]!
       if (provided !== checkDigit) {
-        throw new InvalidInputError(
+        throw new CheckDigitError(
           `UPC-E check digit mismatch: expected ${checkDigit}, got ${provided}`,
         )
       }
@@ -239,7 +239,7 @@ export function encodeUPCE(text: string): { bars: number[]; guards: number[] } {
     checkDigit = calculateCheckDigit(expanded)
     const provided = raw[7]!
     if (provided !== checkDigit) {
-      throw new InvalidInputError(
+      throw new CheckDigitError(
         `UPC-E check digit mismatch: expected ${checkDigit}, got ${provided}`,
       )
     }

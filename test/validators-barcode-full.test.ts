@@ -137,10 +137,119 @@ describe("validateBarcode — rejects invalid input", () => {
 })
 
 describe("validateBarcode — unknown types", () => {
-  it("permits unknown types rather than blocking them", () => {
-    expect(validateBarcode("anything", "some-future-type")).toEqual({ valid: true })
+  it("rejects unknown types rather than waving them through", () => {
+    expect(validateBarcode("anything", "some-future-type")).toEqual({
+      valid: false,
+      error: "Unknown barcode type: some-future-type",
+    })
+  })
+
+  it("rejects unknown types through isValidInput too", () => {
+    expect(isValidInput("anything", "some-future-type")).toBe(false)
+  })
+
+  it("still accepts every type the library actually supports", () => {
+    const types = [
+      "code128",
+      "ean13",
+      "ean8",
+      "upca",
+      "upce",
+      "code39",
+      "code39ext",
+      "code93",
+      "code93ext",
+      "itf",
+      "itf14",
+      "codabar",
+      "msi",
+      "pharmacode",
+      "code11",
+      "gs1-128",
+      "identcode",
+      "leitcode",
+      "postnet",
+      "planet",
+      "plessey",
+      "ean2",
+      "ean5",
+      "gs1-databar",
+      "gs1-databar-limited",
+      "gs1-databar-expanded",
+      "qr",
+      "datamatrix",
+      "gs1-datamatrix",
+      "pdf417",
+      "micropdf417",
+      "aztec",
+      "microqr",
+      "rmqr",
+      "maxicode",
+      "dotcode",
+      "hanxin",
+      "codablock-f",
+      "code16k",
+      "jabcode",
+      "rm4scc",
+      "kix",
+      "auspost",
+      "jppost",
+      "imb",
+    ]
+    for (const type of types) {
+      const result = validateBarcode(validSampleFor(type), type)
+      expect(result.error ?? "", type).not.toMatch(/Unknown barcode type/)
+    }
   })
 })
+
+/** A payload each type accepts, so the "no unknown types" sweep is meaningful */
+function validSampleFor(type: string): string {
+  switch (type) {
+    case "ean13":
+    case "gs1-databar":
+    case "gs1-databar-limited":
+      return "012345678901"
+    case "ean8":
+      return "9638507"
+    case "upca":
+      return "03600029145"
+    case "upce":
+      return "012345"
+    case "itf":
+    case "itf14":
+      return "0001234567890"
+    case "codabar":
+      return "A12345B"
+    case "identcode":
+      return "56310243031"
+    case "leitcode":
+      return "2134807501650"
+    case "postnet":
+    case "planet":
+      return "12345"
+    case "ean2":
+      return "12"
+    case "ean5":
+      return "12345"
+    case "pharmacode":
+      return "1234"
+    case "rm4scc":
+    case "kix":
+      return "SN34RD1A"
+    case "auspost":
+      return "12345678"
+    case "jppost":
+      return "1234567"
+    case "imb":
+      return "01234567094987654321"
+    case "gs1-128":
+    case "gs1-databar-expanded":
+      return "(01)09501101020917"
+    default:
+      return "TEST123"
+  }
+}
 
 describe("validator agrees with the encoders", () => {
   const cases: Array<[string, string]> = [

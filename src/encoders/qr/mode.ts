@@ -2,6 +2,8 @@
  * QR Code encoding modes - detection and encoding
  */
 
+import { InvalidInputError } from "../../errors"
+
 import { ALPHANUMERIC_CHARS } from "./tables"
 
 /** Check if a string can be encoded in numeric mode */
@@ -34,7 +36,7 @@ export function detectMode(text: string): "numeric" | "alphanumeric" | "byte" | 
 /** Get alphanumeric character value (0-44) */
 export function getAlphanumericValue(char: string): number {
   const idx = ALPHANUMERIC_CHARS.indexOf(char)
-  if (idx === -1) throw new Error(`Invalid alphanumeric character: ${char}`)
+  if (idx === -1) throw new InvalidInputError(`Invalid alphanumeric character: ${char}`)
   return idx
 }
 
@@ -108,7 +110,7 @@ export function encodeKanjiData(sjisValues: number[]): number[] {
     } else if (code >= 0xe040 && code <= 0xebbf) {
       adjusted = code - 0xc140
     } else {
-      throw new Error(`Invalid Shift JIS kanji value: 0x${code.toString(16)}`)
+      throw new InvalidInputError(`Invalid Shift JIS kanji value: 0x${code.toString(16)}`)
     }
     const hi = (adjusted >> 8) & 0xff
     const lo = adjusted & 0xff
@@ -140,7 +142,7 @@ export function unicodeToShiftJIS(text: string): number[] {
         values.push(0xe040 + (code - 0x3000 - (0x9ffc - 0x8140)))
       }
     } else {
-      throw new Error(`Character U+${code.toString(16)} cannot be encoded as Kanji`)
+      throw new InvalidInputError(`Character U+${code.toString(16)} cannot be encoded as Kanji`)
     }
   }
   return values

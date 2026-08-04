@@ -37,9 +37,6 @@ export function validateBarcode(text: string, type: string): { valid: boolean; e
       if (digits.length !== 12 && digits.length !== 13) {
         return { valid: false, error: "EAN-13 requires 12 or 13 digits" }
       }
-      if (!/^\d+$/.test(digits)) {
-        return { valid: false, error: "EAN-13 must contain only digits" }
-      }
       if (digits.length === 13 && !verifyEANCheckDigit(digits)) {
         return { valid: false, error: "Invalid EAN-13 check digit" }
       }
@@ -229,8 +226,17 @@ export function validateBarcode(text: string, type: string): { valid: boolean; e
     }
 
     case "auspost": {
-      if (!/^\d{8}$/.test(text.replace(/\s/g, ""))) {
+      // 8-digit DPID, optionally followed by customer information whose length
+      // the Format Control Code decides (0, 5 or 10 characters)
+      const value = text.replace(/\s/g, "")
+      if (!/^\d{8}/.test(value)) {
         return { valid: false, error: "Australia Post requires an 8-digit DPID" }
+      }
+      if (value.length > 8 + 10) {
+        return {
+          valid: false,
+          error: "Australia Post customer information is at most 10 characters",
+        }
       }
       return { valid: true }
     }
@@ -285,7 +291,8 @@ export function validateBarcode(text: string, type: string): { valid: boolean; e
     case "dotcode":
     case "hanxin":
     case "codablock-f":
-    case "code16k": {
+    case "code16k":
+    case "jabcode": {
       if (text.length === 0) {
         return { valid: false, error: `${type} input must not be empty` }
       }
@@ -293,7 +300,7 @@ export function validateBarcode(text: string, type: string): { valid: boolean; e
     }
 
     default:
-      return { valid: true }
+      return { valid: false, error: `Unknown barcode type: ${type}` }
   }
 }
 
@@ -394,6 +401,8 @@ export function validateBarcodeInput(
     }
 
     default:
+      // validateBarcode() above already rejected unknown types; reaching here
+      // just means this symbology has no check digit to report.
       return { valid: true }
   }
 }

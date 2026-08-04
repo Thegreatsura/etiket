@@ -14,6 +14,13 @@ export class CapacityError extends EtiketError {
   override name = "CapacityError"
 }
 
-export class CheckDigitError extends EtiketError {
+/**
+ * A provided check digit does not match the one the data implies.
+ *
+ * Extends {@link InvalidInputError}: a wrong check digit is invalid input, so
+ * code catching the broader class keeps working while callers that care can
+ * single this case out.
+ */
+export class CheckDigitError extends InvalidInputError {
   override name = "CheckDigitError"
 }

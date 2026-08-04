@@ -362,7 +362,7 @@ const MICRO_EC_COEFFS: Record<number, number[]> = {
  */
 function microPDF417RS(data: number[], ecCW: number): number[] {
   const coeffs = MICRO_EC_COEFFS[ecCW]
-  if (!coeffs) throw new Error(`No MicroPDF417 EC coefficients for k=${ecCW}`)
+  if (!coeffs) throw new CapacityError(`No MicroPDF417 EC coefficients for k=${ecCW}`)
 
   const ec = Array.from<number>({ length: ecCW }).fill(0)
   for (const cw of data) {

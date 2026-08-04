@@ -2,6 +2,8 @@
  * PNG rendering types
  */
 
+import { InvalidInputError } from "../../errors"
+
 export interface BarcodePNGOptions {
   /** Pixels per bar unit width (default: 2) */
   scale?: number
@@ -55,11 +57,11 @@ export function parseHexColor(hex: string): [number, number, number] {
     h = h[0]! + h[0]! + h[1]! + h[1]! + h[2]! + h[2]!
   }
   if (h.length !== 6) {
-    throw new Error(`Invalid hex color: ${hex}`)
+    throw new InvalidInputError(`Invalid hex color: ${hex}`)
   }
   const n = Number.parseInt(h, 16)
   if (Number.isNaN(n)) {
-    throw new Error(`Invalid hex color: ${hex}`)
+    throw new InvalidInputError(`Invalid hex color: ${hex}`)
   }
   return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff]
 }

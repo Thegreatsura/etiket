@@ -2,7 +2,7 @@
  * Interleaved 2 of 5 (ITF) and ITF-14 barcode encoder
  */
 
-import { InvalidInputError } from "../errors"
+import { InvalidInputError, CheckDigitError } from "../errors"
 
 // Digit patterns: 5 elements each (N=1 narrow, W=3 wide)
 const DIGIT_PATTERNS: number[][] = [
@@ -122,7 +122,7 @@ export function encodeITF14(text: string): number[] {
     const expected = calculateCheckDigit(nums)
     const provided = Number(text[13])
     if (provided !== expected) {
-      throw new InvalidInputError(
+      throw new CheckDigitError(
         `ITF-14 check digit mismatch: expected ${expected}, got ${provided}`,
       )
     }
