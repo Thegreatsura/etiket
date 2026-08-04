@@ -185,17 +185,28 @@ function selectMicroVersion(
   const requestedEc = options.ecLevel
 
   // Determine the EC key for the given version
-  function getEcKey(v: number): string {
+  /**
+   * The EC key a version will actually use.
+   *
+   * M1 carries no error correction level of its own. Otherwise a requested
+   * level is either available or it is not — falling back to L would hand the
+   * caller less protection than they asked for without saying so.
+   */
+  function getEcKey(v: number): string | undefined {
     if (v === 1) return "_"
-    if (requestedEc && CAPACITY[v]![requestedEc]) return requestedEc
-    return "L"
+    if (!requestedEc) return "L"
+    return CAPACITY[v]![requestedEc] ? requestedEc : undefined
   }
 
   if (options.version) {
     const v = options.version
     const ecKey = getEcKey(v)
-    const caps = CAPACITY[v]
-    const cap = caps?.[ecKey]
+    if (!ecKey) {
+      throw new InvalidInputError(
+        `Micro QR M${v} does not support EC level ${requestedEc} — M1 has none, M2 and M3 offer L and M, only M4 offers Q`,
+      )
+    }
+    const cap = CAPACITY[v]?.[ecKey]
     if (!cap) throw new CapacityError(`Micro QR M${v} does not support EC level ${ecKey}`)
     return { version: v, cap, ecKey }
   }
@@ -204,8 +215,10 @@ function selectMicroVersion(
 
   for (let v = 1; v <= 4; v++) {
     const ecKey = getEcKey(v)
-    const caps = CAPACITY[v]!
-    const cap = caps[ecKey]
+    // A version that cannot provide the requested level is skipped, not
+    // silently downgraded — the search moves on to a larger symbol
+    if (!ecKey) continue
+    const cap = CAPACITY[v]![ecKey]
     if (!cap) continue
     const modeKey = mode as keyof MicroQRCapacity
     if (typeof cap[modeKey] === "number" && dataLen <= (cap[modeKey] as number)) {
@@ -213,7 +226,9 @@ function selectMicroVersion(
     }
   }
 
-  throw new CapacityError(`Data too long for Micro QR Code with ${mode} mode`)
+  throw new CapacityError(
+    `Data too long for Micro QR Code with ${mode} mode${requestedEc ? ` at EC level ${requestedEc}` : ""}`,
+  )
 }
 
 function buildMicroDataBits(

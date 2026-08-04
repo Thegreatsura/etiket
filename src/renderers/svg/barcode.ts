@@ -42,7 +42,15 @@ export function renderBarcodeSVG(bars: number[], options: BarcodeSVGOptions = {}
   let totalUnits = 0
   for (const w of bars) totalUnits += w
 
-  const barcodeWidth = totalUnits * barWidth
+  // `width` asks for a total symbol width; back out the module width from it,
+  // unless the caller pinned the module width directly
+  const pinnedModule = options.moduleSize ?? options.barWidth
+  const moduleWidth =
+    options.width !== undefined && pinnedModule === undefined && totalUnits > 0
+      ? Math.max((options.width - mLeft - mRight) / totalUnits, 0)
+      : barWidth
+
+  const barcodeWidth = totalUnits * moduleWidth
   const textHeight = showText ? fontSize + 8 : 0
   const bearerHeight = bearerBars ? bearerBarWidth * 2 : 0
 
@@ -110,7 +118,7 @@ export function renderBarcodeSVG(bars: number[], options: BarcodeSVGOptions = {}
   let isBar = true
   const halfGap = barGap / 2
   for (const w of bars) {
-    const barPixelWidth = w * barWidth
+    const barPixelWidth = w * moduleWidth
     if (isBar) {
       const gappedWidth = barPixelWidth - barGap
       if (gappedWidth > 0) {

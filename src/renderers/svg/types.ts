@@ -91,6 +91,11 @@ export interface QRCodeSVGOptions extends SVGAccessibilityOptions {
 export type MeasurementUnit = "px" | "mm" | "in" | "pt" | "cm"
 
 export interface BarcodeSVGOptions extends SVGAccessibilityOptions {
+  /**
+   * Total symbol width in units, margins included. The module width is derived
+   * from it, so this and `moduleSize` are two ways of saying the same thing —
+   * `moduleSize` wins if both are given.
+   */
   width?: number
   height?: number
   /**

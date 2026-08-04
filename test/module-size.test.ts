@@ -82,3 +82,17 @@ describe("matrix symbols", () => {
     expect(svgSize(qrcode("HELLO", { size: 250 })).width).toBe(250)
   })
 })
+
+describe("the width option", () => {
+  it("derives the module width from a requested total width", () => {
+    const svg = barcode("HELLO", { type: "code128", width: 400, margin: 0 })
+    expect(svgSize(svg).width).toBeCloseTo(400, 5)
+  })
+
+  it("lets an explicit module width win", () => {
+    // Both given: moduleSize is the more specific instruction
+    expect(barcode("HELLO", { type: "code128", width: 400, moduleSize: 2 })).toBe(
+      barcode("HELLO", { type: "code128", moduleSize: 2 }),
+    )
+  })
+})

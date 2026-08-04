@@ -92,7 +92,7 @@ export type EncodeType = (typeof ENCODE_TYPES)[number]
 export interface EncodeOptions extends Omit<BarcodeEncodingOptions, "type"> {
   type?: EncodeType
 
-  /** Australia Post Format Control Code ("11", "59" or "62"). */
+  /** Australia Post Format Control Code: "11", "45", "59", "62", "87" or "92". */
   fcc?: string
   /** Second data field for IMb (routing code) and Japan Post (address). */
   routingCode?: string

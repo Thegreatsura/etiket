@@ -20,7 +20,7 @@ export type PostalType = "postnet" | "planet" | "rm4scc" | "kix" | "auspost" | "
 export interface PostalEncodingOptions {
   /** Postal symbology. Default "postnet". */
   type?: PostalType
-  /** Australia Post Format Control Code ("11", "59" or "62"). Default "11". */
+  /** Australia Post Format Control Code: "11", "45", "59", "62", "87" or "92". Default "11". */
   fcc?: string
   /**
    * Second data field, where the symbology has one:
