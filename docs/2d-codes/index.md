@@ -1,251 +1,126 @@
 # 2D Codes
 
 Besides QR Code, etiket supports a full range of 2D, stacked and polychrome
-symbologies. Every format has a convenience function returning SVG, a raw
-encoder returning the module matrix, and — apart from JAB Code — PNG output.
+symbologies. Every format has a convenience function returning SVG, a raw encoder
+returning the module matrix, and PNG output.
 
-| Format         | Function          | Raw encoder           | PNG                  |
-| :------------- | :---------------- | :-------------------- | :------------------- |
-| Data Matrix    | `datamatrix()`    | `encodeDataMatrix`    | `datamatrixPNG()`    |
-| GS1 DataMatrix | `gs1datamatrix()` | `encodeGS1DataMatrix` | `gs1datamatrixPNG()` |
-| PDF417         | `pdf417()`        | `encodePDF417`        | `pdf417PNG()`        |
-| MicroPDF417    | `micropdf417()`   | `encodeMicroPDF417`   | `micropdf417PNG()`   |
-| Aztec          | `aztec()`         | `encodeAztec`         | `aztecPNG()`         |
-| Micro QR       | `microqr()`       | `encodeMicroQR`       | `microqrPNG()`       |
-| rMQR           | `rmqr()`          | `encodeRMQR`          | `rmqrPNG()`          |
-| MaxiCode       | `maxicode()`      | `encodeMaxiCode`      | `maxicodePNG()`      |
-| DotCode        | `dotcode()`       | `encodeDotCode`       | `dotcodePNG()`       |
-| Han Xin        | `hanxin()`        | `encodeHanXin`        | `hanxinPNG()`        |
-| Codablock-F    | `codablockf()`    | `encodeCodablockF`    | `codablockfPNG()`    |
-| Code 16K       | `code16k()`       | `encodeCode16K`       | `code16kPNG()`       |
-| JAB Code       | `jabcode()`       | `encodeJABCode`       | —                    |
+| Format                                                | Function          | Raw encoder           | PNG                  |
+| :---------------------------------------------------- | :---------------- | :-------------------- | :------------------- |
+| [Data Matrix](/2d-codes/datamatrix)                   | `datamatrix()`    | `encodeDataMatrix`    | `datamatrixPNG()`    |
+| [GS1 DataMatrix](/2d-codes/datamatrix#gs1-datamatrix) | `gs1datamatrix()` | `encodeGS1DataMatrix` | `gs1datamatrixPNG()` |
+| [PDF417](/2d-codes/pdf417)                            | `pdf417()`        | `encodePDF417`        | `pdf417PNG()`        |
+| [MicroPDF417](/2d-codes/micropdf417)                  | `micropdf417()`   | `encodeMicroPDF417`   | `micropdf417PNG()`   |
+| [Aztec](/2d-codes/aztec)                              | `aztec()`         | `encodeAztec`         | `aztecPNG()`         |
+| [Micro QR](/qr-code/micro-qr)                         | `microqr()`       | `encodeMicroQR`       | `microqrPNG()`       |
+| [rMQR](/qr-code/rmqr)                                 | `rmqr()`          | `encodeRMQR`          | `rmqrPNG()`          |
+| [MaxiCode](/2d-codes/maxicode)                        | `maxicode()`      | `encodeMaxiCode`      | `maxicodePNG()`      |
+| [DotCode](/2d-codes/dotcode)                          | `dotcode()`       | `encodeDotCode`       | `dotcodePNG()`       |
+| [Han Xin](/2d-codes/hanxin)                           | `hanxin()`        | `encodeHanXin`        | `hanxinPNG()`        |
+| [Codablock F](/2d-codes/codablock-f)                  | `codablockf()`    | `encodeCodablockF`    | `codablockfPNG()`    |
+| [Code 16K](/2d-codes/code16k)                         | `code16k()`       | `encodeCode16K`       | `code16kPNG()`       |
+| [JAB Code](/2d-codes/jabcode)                         | `jabcode()`       | `encodeJABCode`       | `jabcodePNG()`       |
 
-## Data Matrix
-
-ECC 200 standard. 24 square sizes (10x10 to 144x144) plus 6 rectangular sizes.
-
-```ts
-import { datamatrix, encodeDataMatrix } from "etiket"
-
-// Convenience function — returns SVG
-datamatrix("Hello World")
-datamatrix("Data", { size: 200, color: "#333" })
-
-// Raw encoder — returns boolean[][]
-const matrix = encodeDataMatrix("Hello")
-```
-
-Used in: electronics, healthcare, aerospace (small items requiring dense data).
-
-## PDF417
-
-Stacked 2D barcode with 929 possible codeword values and 9 error correction levels.
+Data Matrix, PDF417 and Aztec have sub-path entries of their own
+(`etiket/datamatrix`, `etiket/pdf417`, `etiket/aztec`); the rest are on
+`etiket/2d`.
 
 ```ts
-import { pdf417, encodePDF417 } from "etiket"
-
-// Convenience function — returns SVG
-pdf417("Hello World")
-pdf417("Data", { ecLevel: 4, columns: 5, compact: true })
-
-// Raw encoder — returns { matrix, rows, cols }
-const result = encodePDF417("Hello", { ecLevel: 2 })
-```
-
-| Option    | Type      | Default | Description                         |
-| :-------- | :-------- | :------ | :---------------------------------- |
-| `ecLevel` | `0-8`     | `2`     | Error correction level              |
-| `columns` | `1-30`    | auto    | Number of data columns              |
-| `compact` | `boolean` | `false` | Compact PDF417 (no right indicator) |
-
-Used in: government IDs, transport tickets, shipping labels.
-
-## Aztec Code
-
-Bullseye-centered barcode. No quiet zone required — ideal for space-constrained applications.
-
-```ts
-import { aztec, encodeAztec } from "etiket"
-
-// Convenience function — returns SVG
-aztec("Hello World")
-aztec("Data", { ecPercent: 33, size: 200 })
-
-// Raw encoder — returns boolean[][]
-const matrix = encodeAztec("Hello", { compact: true })
-```
-
-| Option      | Type      | Default | Description                               |
-| :---------- | :-------- | :------ | :---------------------------------------- |
-| `ecPercent` | `number`  | `23`    | Error correction percentage               |
-| `layers`    | `number`  | auto    | Force specific layer count                |
-| `compact`   | `boolean` | auto    | Compact (1-4 layers) or full-range (1-32) |
-
-Used in: boarding passes, transport tickets, healthcare.
-
-## Micro QR Code
-
-Compact QR variant (ISO/IEC 18004) with a single finder pattern. Versions M1–M4,
-11×11 to 17×17 modules.
-
-```ts
-import { microqr, encodeMicroQR } from "etiket"
-
-microqr("12345")
-microqr("12345", { version: 3, ecLevel: "M", size: 200 })
-
-const matrix = encodeMicroQR("12345")
-```
-
-| Option    | Type      | Default | Description                    |
-| :-------- | :-------- | :------ | :----------------------------- |
-| `version` | `1-4`     | auto    | M1–M4                          |
-| `ecLevel` | `L\|M\|Q` | auto    | Error correction (M1 has none) |
-| `mask`    | `0-3`     | auto    | Force a mask pattern           |
-
-Used in: small electronic components, where a full QR code will not fit.
-
-## rMQR (Rectangular Micro QR)
-
-ISO/IEC 23941 rectangular QR variant for narrow spaces.
-
-```ts
-import { rmqr, encodeRMQR } from "etiket"
-
-rmqr("HELLO")
-rmqr("HELLO", { ecLevel: "H" })
-```
-
-| Option    | Type   | Default | Description               |
-| :-------- | :----- | :------ | :------------------------ |
-| `version` | `0-31` | auto    | Index into the size table |
-| `ecLevel` | `M\|H` | `M`     | Error correction level    |
-
-Used in: cables, cylindrical items, narrow labels.
-
-## MaxiCode
-
-Fixed 33×30 hexagonal matrix with a bullseye finder, used by carriers for
-package sorting. Modules are hexagons on a staggered grid, so MaxiCode gets a
-dedicated renderer.
-
-```ts
-import { maxicode, encodeMaxiCode, maxicodePNG } from "etiket"
+import { maxicode, encodeDotCode } from "etiket/2d"
 
 maxicode("HELLO")
-maxicode("HELLO", { mode: 2, postalCode: "123456789", countryCode: 840, serviceClass: 1 })
-
-maxicodePNG("HELLO", { moduleSize: 10 })
+encodeDotCode("HELLO")
 ```
 
-| Option         | Type     | Default | Description                                           |
-| :------------- | :------- | :------ | :---------------------------------------------------- |
-| `mode`         | `2-6`    | `4`     | 2/3 structured carrier message, 4 standard, 5 full EC |
-| `postalCode`   | `string` | —       | Modes 2 and 3                                         |
-| `countryCode`  | `number` | —       | ISO country code, modes 2 and 3                       |
-| `serviceClass` | `number` | —       | Carrier service class, modes 2 and 3                  |
+## Choosing a Format
 
-Modes 2 and 3 carry a Structured Carrier Message: mode 2 for numeric postal
-codes, mode 3 for alphanumeric ones.
+| If you need                            | Use                                  |
+| :------------------------------------- | :----------------------------------- |
+| Maximum density on a tiny label        | [Data Matrix](/2d-codes/datamatrix)  |
+| A large payload on a scuffable label   | [PDF417](/2d-codes/pdf417)           |
+| No quiet zone                          | [Aztec](/2d-codes/aztec)             |
+| A parcel carrier symbol                | [MaxiCode](/2d-codes/maxicode)       |
+| High-speed inkjet marking              | [DotCode](/2d-codes/dotcode)         |
+| The Chinese national standard          | [Han Xin](/2d-codes/hanxin)          |
+| Linear scanning hardware, long payload | [Codablock F](/2d-codes/codablock-f) |
+| A narrow strip rather than a square    | [rMQR](/qr-code/rmqr)                |
 
-Used in: parcel carriers (notably UPS).
+## Shared Rendering Options
 
-## DotCode
+Every format above except [JAB Code](/2d-codes/jabcode) renders through
+`renderMatrixSVG` and accepts:
 
-High-speed dot matrix symbology for laser-marked and inkjet-printed items.
+| Option                                  | Type       | Default   | Description                                  |
+| :-------------------------------------- | :--------- | :-------- | :------------------------------------------- |
+| `size`                                  | `number`   | `200`     | SVG size in pixels                           |
+| `margin`                                | `number`   | `2`       | Quiet zone in modules                        |
+| `color`                                 | `string`   | `#000`    | Module colour                                |
+| `background`                            | `string`   | `#fff`    | Background; `transparent` omits the rect     |
+| `rowHeight`                             | `number`   | see below | Row height as a multiple of the module width |
+| `rowHeights`                            | `number[]` | —         | Per-row heights, for mixed-height symbols    |
+| `ariaLabel` / `role` / `title` / `desc` | `string`   | —         | Accessibility metadata                       |
 
-```ts
-import { dotcode, encodeDotCode } from "etiket"
+`rowHeight` defaults to `1` — square modules — for every format **except** the
+stacked ones, and a few functions override other defaults too:
 
-dotcode("HELLO")
-```
+| Function        | Option      | Default | Why                                |
+| :-------------- | :---------- | :------ | :--------------------------------- |
+| `aztec()`       | `margin`    | `0`     | Aztec needs no quiet zone          |
+| `maxicode()`    | `size`      | `400`   | Hexagonal modules need the room    |
+| `pdf417()`      | `width`     | `400`   | Sets the overall symbol width      |
+| `micropdf417()` | `rowHeight` | `2`     | Stacked aspect ratio from the spec |
+| `codablockf()`  | `rowHeight` | `8`     | Tall rows, 1-module separators     |
+| `code16k()`     | `rowHeight` | `8`     | Tall rows, 1-module separators     |
 
-Used in: tobacco packaging, high-speed production lines.
+`jabcode()` is the exception in kind, not just in defaults: it renders through
+`renderColorMatrixSVG`, which has **no `color` option** and takes a `palette`
+instead. See its [page](/2d-codes/jabcode) for the full option set.
 
-## Han Xin Code
-
-Chinese national 2D standard (ISO/IEC 20830), 84 versions from 23×23 to
-189×189 modules, with four finder patterns.
-
-```ts
-import { hanxin, encodeHanXin } from "etiket"
-
-hanxin("HELLO")
-hanxin("HELLO", { ecLevel: 3, version: 5 })
-```
-
-| Option    | Type   | Default | Description                                     |
-| :-------- | :----- | :------ | :---------------------------------------------- |
-| `ecLevel` | `1-4`  | `2`     | L1 ≈ 8%, L2 ≈ 15%, L3 ≈ 23%, L4 ≈ 30%           |
-| `version` | `1-84` | auto    | Symbol is `version * 2 + 21` modules square     |
-| `mask`    | `1-4`  | auto    | Mask pattern; chosen by evaluation when omitted |
-
-Digit runs long enough to pay for the mode switch are compacted with numeric
-mode; everything else is encoded in byte mode as UTF-8. The standard's text and
-Chinese modes are size optimisations that etiket does not yet apply — a
-conforming reader accepts byte mode, but one that defaults to GB 18030 will not
-render non-ASCII text correctly.
+The PNG functions take `moduleSize` (pixels per module) and a `margin` in
+modules, plus the same `rowHeight` / `rowHeights` and colours — see
+[Rendering](/rendering/).
 
 ## Stacked Symbologies
 
-Codablock-F, Code 16K and MicroPDF417 stack rows of linear barcodes. Their rows
-are taller than a module is wide; `rowHeight` controls that ratio and defaults
-to a spec-appropriate value per format.
+[Codablock F](/2d-codes/codablock-f), [Code 16K](/2d-codes/code16k) and
+[MicroPDF417](/2d-codes/micropdf417) stack rows of linear barcodes, so their rows
+are taller than a module is wide.
+
+Codablock F and Code 16K return a matrix that **includes the separator rows** —
+`2 * rows + 1` entries — together with a `separatorRows` array listing which are
+which. The convenience functions render separators 1 module tall and data rows at
+`rowHeight`:
 
 ```ts
-import { codablockf, code16k, micropdf417 } from "etiket"
+import { codablockf, code16k, micropdf417, encodeCode16K } from "etiket"
 
 codablockf("CODABLOCK F DATA", { columns: 8 })
 code16k("CODE 16K DATA")
 micropdf417("MICRO", { columns: 2 })
 
-// Square modules instead of tall rows
+// Square modules instead of tall rows — useful for inspecting the matrix
 code16k("DATA", { rowHeight: 1 })
+
+const result = encodeCode16K("DATA")
+result.rows // data rows
+result.matrix.length // 2 * rows + 1
+result.separatorRows // indices of the separator rows
 ```
 
 | Format      | Option    | Description                    |
 | :---------- | :-------- | :----------------------------- |
-| Codablock-F | `columns` | Data columns per row           |
+| Codablock F | `columns` | `4`–`62` data columns per row  |
 | MicroPDF417 | `columns` | `1`–`4` data columns           |
 | Code 16K    | —         | Rows chosen from the data size |
 
-Used in: healthcare (Codablock-F), small-item labelling (Code 16K, MicroPDF417).
+## GS1 DataBar Stacked
 
-## JAB Code
-
-Polychrome symbology carrying more than one bit per module. `encodeJABCode`
-returns a matrix of palette indices plus the palette itself, so it renders
-through the colour matrix renderer.
+The three stacked [GS1 DataBar](/barcodes/gs1-databar) variants also produce
+module matrices rather than bar widths, so they live with the 2D functions:
 
 ```ts
-import { jabcode, encodeJABCode, renderColorMatrixSVG } from "etiket"
+import { gs1databarStacked, gs1databarStackedOmni, gs1databarExpandedStacked } from "etiket"
 
-jabcode("HELLO")
-jabcode("HELLO", { colors: 8, ecPercent: 30 })
-
-// Custom palette
-const result = encodeJABCode("HELLO", { colors: 4 })
-renderColorMatrixSVG(result.matrix, result.palette, {
-  palette: ["#000000", "#e63946", "#457b9d", "#f1faee"],
-})
+gs1databarStacked("2001234567890")
+gs1databarStackedOmni("2001234567890")
+gs1databarExpandedStacked("(01)90012345678908(3103)001750", { segments: 4 })
 ```
-
-| Option      | Type     | Default | Description                 |
-| :---------- | :------- | :------ | :-------------------------- |
-| `colors`    | `4 \| 8` | `4`     | Palette size                |
-| `ecPercent` | `number` | `20`    | Error correction percentage |
-
-JAB Code has no PNG output, since the PNG encoder writes single-colour symbols.
-
-## Shared Rendering Options
-
-Every matrix-based format accepts:
-
-| Option                                  | Type     | Default | Description                                  |
-| :-------------------------------------- | :------- | :------ | :------------------------------------------- |
-| `size`                                  | `number` | `200`   | SVG size in pixels                           |
-| `margin`                                | `number` | `2`     | Quiet zone in modules                        |
-| `color`                                 | `string` | `#000`  | Module colour                                |
-| `background`                            | `string` | `#fff`  | Background; `transparent` omits the rect     |
-| `rowHeight`                             | `number` | `1`     | Row height as a multiple of the module width |
-| `ariaLabel` / `role` / `title` / `desc` | `string` | —       | Accessibility metadata                       |

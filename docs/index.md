@@ -43,20 +43,23 @@ const png = qrcodePNG("https://example.com", { moduleSize: 8 })
 | [Postal](/postal/)       | POSTNET, PLANET, RM4SCC, KIX, Australia Post, Japan Post, IMb          |
 | [QR](/qr-code/)          | QR Code, Micro QR, rMQR                                                |
 | [2D](/2d-codes/)         | Data Matrix, PDF417, MicroPDF417, Aztec, MaxiCode, DotCode, Han Xin    |
-| [Stacked](/2d-codes/)    | Codablock-F, Code 16K                                                  |
-| [Polychrome](/2d-codes/) | JAB Code                                                               |
+| [Stacked](/2d-codes/)    | Codablock F, Code 16K, GS1 DataBar Stacked                             |
+| [Polychrome](/2d-codes/) | JAB Code (experimental — [not conformant](/2d-codes/jabcode))          |
 
 Run `etiket list` to print the full set from the [CLI](/getting-started/cli).
 
 ## Entry Points
 
-| Entry               | Contents                       |
-| :------------------ | :----------------------------- |
-| `etiket`            | Everything                     |
-| `etiket/barcode`    | 1D barcodes                    |
-| `etiket/postal`     | Postal symbologies             |
-| `etiket/qr`         | QR, Micro QR, rMQR             |
-| `etiket/datamatrix` | Data Matrix and GS1 DataMatrix |
-| `etiket/pdf417`     | PDF417 and MicroPDF417         |
-| `etiket/aztec`      | Aztec Code                     |
-| `etiket/png`        | PNG output for every format    |
+| Entry               | Contents                                                               |
+| :------------------ | :--------------------------------------------------------------------- |
+| `etiket`            | Everything                                                             |
+| `etiket/barcode`    | 1D barcodes                                                            |
+| `etiket/postal`     | Postal symbologies                                                     |
+| `etiket/qr`         | QR, Micro QR, rMQR and the payload helpers                             |
+| `etiket/datamatrix` | Data Matrix and GS1 DataMatrix                                         |
+| `etiket/pdf417`     | PDF417 and MicroPDF417                                                 |
+| `etiket/aztec`      | Aztec Code                                                             |
+| `etiket/2d`         | MaxiCode, DotCode, Han Xin, Codablock F, Code 16K, JAB Code            |
+| `etiket/png`        | PNG output for every format                                            |
+| `etiket/errors`     | `EtiketError`, `InvalidInputError`, `CapacityError`, `CheckDigitError` |
+| `etiket/validators` | `validateBarcode`, `validateQRInput` and the check-digit helpers       |

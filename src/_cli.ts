@@ -60,6 +60,9 @@ import {
   optimizeSVG,
   validateBarcodeInput,
   validateQRInput,
+  gs1composite,
+  gs1compositePNG,
+  jabcodePNG,
 } from "./index"
 import type { BarcodeType } from "./index"
 import type { PostalType } from "./_postal"
@@ -73,6 +76,7 @@ import type {
 } from "./renderers/svg/types"
 import type { ErrorCorrectionLevel, QRCodeOptions } from "./encoders/qr/types"
 import type { DataMatrixShape } from "./encoders/datamatrix/tables"
+import type { CompositeLinearType } from "./encoders/gs1-composite"
 
 /** Symbologies reachable through `etiket barcode`. */
 const BARCODE_TYPES: BarcodeType[] = [
@@ -1075,6 +1079,73 @@ const linkCommand = defineCommand({
   },
 })
 
+const compositeCommand = defineCommand({
+  meta: {
+    name: "gs1composite",
+    description: "Generate a complete GS1 Composite symbol (linear + separator + 2D)",
+  },
+  args: {
+    linear: {
+      type: "positional",
+      description:
+        "Primary symbology: databar-omni, databar-truncated, databar-expanded, ean13, ean8, upca, upce",
+      required: true,
+    },
+    data: {
+      type: "positional",
+      description:
+        'Linear and composite data separated by "|", e.g. "01234567890128|(17)260101(10)LOT42"',
+      required: true,
+    },
+    ...matrixArgs,
+    version: { type: "string", description: "Composite version: CC-A, CC-B or CC-C" },
+    columns: { type: "string", description: "Data columns of the 2D component" },
+  },
+  run({ args }) {
+    const values = args as unknown as MatrixArgValues & {
+      linear: string
+      data: string
+      version?: string
+      columns?: string
+    }
+    const linearTypes = [
+      "databar-omni",
+      "databar-truncated",
+      "databar-expanded",
+      "ean13",
+      "ean8",
+      "upca",
+      "upce",
+    ]
+    if (!linearTypes.includes(values.linear)) {
+      consola.error(`Unknown composite primary "${values.linear}" — use ${linearTypes.join(", ")}`)
+      process.exitCode = 1
+      return
+    }
+    if (!values.data.includes("|")) {
+      consola.error('Composite data must be "<linear data>|<composite data>"')
+      process.exitCode = 1
+      return
+    }
+    const encoding = {
+      type: values.version as "CC-A" | "CC-B" | "CC-C" | undefined,
+      columns: num(values.columns, "columns"),
+    }
+    const linear = values.linear as CompositeLinearType
+    if (wantsPNG(values)) {
+      output(
+        gs1compositePNG(linear, values.data, { ...encoding, ...pngMatrixOptions(values) }),
+        values.output,
+      )
+      return
+    }
+    output(
+      gs1composite(linear, values.data, { ...encoding, ...svgMatrixOptions(values) }),
+      values.output,
+    )
+  },
+})
+
 const validateCommand = defineCommand({
   meta: {
     name: "validate",
@@ -1292,10 +1363,12 @@ export const main = defineCommand({
         ecPercent: num(args["ec-percent"] as string | undefined, "ec-percent"),
       }),
       svg: jabcode,
+      png: jabcodePNG,
     }),
     wifi: wifiCommand,
     contact: contactCommand,
     link: linkCommand,
+    gs1composite: compositeCommand,
     validate: validateCommand,
     list: listCommand,
   },

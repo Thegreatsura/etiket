@@ -143,12 +143,11 @@ describe("CLI — PNG output", () => {
     expectPNG(readFileSync(path), "explicit --png")
   })
 
-  it("reports an error for formats without PNG support", async () => {
-    // JAB Code is polychrome; the palette-indexed matrix has no PNG path yet
-    const before = process.exitCode
-    await runCommand(main, { rawArgs: ["jabcode", "HELLO", "--png"] })
-    expect(process.exitCode).toBe(1)
-    process.exitCode = before
+  it("renders JAB Code as a true-colour PNG", async () => {
+    // Polychrome, so it goes through the true-colour path rather than the
+    // two-colour one the other symbologies use
+    const png = await runToBytes(["jabcode", "HELLO"], "jab.png")
+    expectPNG(png, "jabcode")
   })
 })
 
@@ -811,5 +810,32 @@ describe("CLI — error propagation", () => {
     await expect(
       runCommand(main, { rawArgs: ["postal", "ABCDE", "--type", "postnet"] }),
     ).rejects.toThrow()
+  })
+})
+
+describe("gs1composite", () => {
+  it("writes a complete composite symbol", async () => {
+    const svg = await runToFile(
+      ["gs1composite", "databar-omni", "01234567890128|(10)LOT42"],
+      "composite.svg",
+    )
+    expect(svg).toContain("<svg")
+    expect(svg).toContain("<path")
+  })
+
+  it("writes a PNG when the output file ends in .png", async () => {
+    const png = await runToBytes(
+      ["gs1composite", "databar-omni", "01234567890128|(10)LOT42"],
+      "composite.png",
+    )
+    expect(Array.from(png.slice(0, 4))).toEqual([137, 80, 78, 71])
+  })
+
+  it("rejects an unknown primary symbology", async () => {
+    expect(await runExpectingFailure(["gs1composite", "nope", "0123|(10)X"])).toBe(1)
+  })
+
+  it("rejects data without the separator", async () => {
+    expect(await runExpectingFailure(["gs1composite", "databar-omni", "01234567890128"])).toBe(1)
   })
 })
