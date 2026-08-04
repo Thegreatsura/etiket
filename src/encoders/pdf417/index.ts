@@ -137,8 +137,17 @@ export function encodePDF417(text: string, options: PDF417Options = {}): PDF417R
     }
     paddedData.push(...macroBlock)
   } else {
-    // Symbol length descriptor (total codewords including this one, excluding EC)
-    paddedData.push(totalDataWithLength, ...bodyCodewords)
+    // Symbol length descriptor: the descriptor itself, the data and the pads,
+    // excluding EC (ISO/IEC 15438 5.5.1). Leaving the pads out decodes anyway,
+    // because a reader tolerates a short count and the pad is a no-op latch —
+    // but it puts every EC codeword out of step with the reference.
+    const descriptor = totalDataWithLength + padCount
+    if (descriptor > MAX_CODEWORD_VALUE) {
+      throw new CapacityError(
+        `PDF417 symbol needs a length descriptor of ${descriptor}, above the ${MAX_CODEWORD_VALUE} a codeword holds`,
+      )
+    }
+    paddedData.push(descriptor, ...bodyCodewords)
     for (let i = 0; i < padCount; i++) {
       paddedData.push(PAD_CODEWORD)
     }

@@ -73,13 +73,6 @@ import {
  * description of the divergence, both of which end up in the test title.
  */
 const DIVERGENT: Record<string, string> = {
-  pdf417:
-    "#143 — matches exactly for pure uppercase payloads (HELLO, ABCDEF) and diverges for " +
-    "anything with digits, spaces or lower case: the text compaction sub-mode latches and " +
-    "the numeric-compaction choice differ. Codeword patterns and EC agree, and the symbols " +
-    "decode, so this may be a valid alternative encoding — but the sub-mode code has never " +
-    "been covered by a test",
-
   micropdf417:
     "not a defect — etiket picks a smaller variant than BWIPP for the same data (1x11 vs " +
     "1x14), and zxing decodes every one of these payloads from the smaller symbol; where " +

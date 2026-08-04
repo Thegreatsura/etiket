@@ -99,11 +99,16 @@ src/
     barcode.ts              # Per-format validation
     qr.ts                   # QR validation with metadata
 test/
-  *.test.ts                 # 81 test files, 1560+ tests
+  *.test.ts                 # 112 test files, 2800+ tests
+  _bwip.ts                  # bwip-js (BWIPP) oracle: module data extraction
+  bwip-compare.test.ts      # Module-for-module comparison against BWIPP
   qr-roundtrip.test.ts      # QR encode→decode via jsQR (all versions, EC, masks)
   2d-roundtrip.test.ts      # 2D decode verification via zxing-wasm
+  1d-roundtrip.test.ts      # 1D decode verification via zxing-wasm
   encoders-modes-roundtrip.test.ts # Encoder mode coverage, decoded with zxing
-  barcode-roundtrip.test.ts # 1D barcode structural validation
+  barcode-roundtrip.test.ts # Structural checks for formats with no decoder
+  api-subpaths.test.ts      # package.json#exports vs the source entries
+  docs-coverage.test.ts     # Every export has an API reference entry
   cli.test.ts               # Every CLI subcommand, driven through citty
 docs/
   **/*.md                   # Documentation (mdzilla-compatible)
@@ -111,11 +116,25 @@ docs/
 
 ## Public API
 
-Single entry: `etiket` (everything). Sub-paths: `etiket/barcode`, `etiket/postal`, `etiket/qr`, `etiket/datamatrix`, `etiket/pdf417`, `etiket/aztec`, `etiket/png`.
+Single entry: `etiket` (everything). Sub-paths: `etiket/barcode`, `etiket/postal`,
+`etiket/qr`, `etiket/datamatrix`, `etiket/pdf417`, `etiket/aztec`, `etiket/2d`,
+`etiket/png`, `etiket/errors`, `etiket/validators`.
+
+`test/api-subpaths.test.ts` asserts `package.json#exports` and the source entries
+agree, that no subpath exports something the main entry lacks, and that shared
+symbols are the same object — so the surface cannot drift.
 
 1D + postal: `barcode()`, `encodeBars()`, `postal()`, `encodePostal()`.
 
 2D: `qrcode()`, `microqr()`, `rmqr()`, `datamatrix()`, `gs1datamatrix()`, `pdf417()`, `micropdf417()`, `aztec()`, `maxicode()`, `dotcode()`, `hanxin()`, `codablockf()`, `code16k()`, `jabcode()`.
+
+GS1: `gs1qr()`, `gs1composite()`, `encodeGS1CompositeSymbol()`, the DataBar
+family including the stacked variants.
+
+Sequences: `encodeQRSequence()` (Structured Append), `encodePDF417Sequence()`
+(Macro PDF417).
+
+Batch: `barcodes()`, `qrcodes()`, `barcodeSheet()`, `qrcodeSheet()`.
 
 Helpers: `swissQR()`, `gs1DigitalLink()`, `wifi()`, `vcard()`, `mecard()`, `event()`, `phone()`, `email()`, `sms()`, `geo()`, `url()`, `encode()`, `optimizeSVG()`.
 
@@ -160,14 +179,31 @@ pnpm docs:dev       # npx mdzilla ./docs
 - **Framework:** vitest
 - **Location:** `test/` directory (flat structure)
 - **Coverage:** `@vitest/coverage-v8`
-- **Round-trip testing:** jsQR for QR decode verification, zxing-wasm for 2D
-  (QR, Micro QR, Data Matrix, PDF417, Aztec), zbar.wasm for 1D
-- **Dev dependencies for testing:** `jsqr`, `zbar.wasm`, `zxing-wasm`, `bwip-js`, `rmqr`
+- **Round-trip testing:** zxing-wasm decodes QR, Micro QR, rMQR, Data Matrix,
+  PDF417, MicroPDF417, Aztec, MaxiCode and every 1D format it supports; jsQR
+  covers QR independently
+- **Reference comparison:** bwip-js (BWIPP) for the formats no decoder
+  implements — see `test/_bwip.ts` and `test/bwip-compare.test.ts`
+- **Dev dependencies for testing:** `jsqr`, `zxing-wasm`, `bwip-js`
 - Run all: `pnpm test` (lint + typecheck + vitest)
 - Run single: `pnpm vitest run test/<file>.test.ts`
 - Coverage: `pnpm vitest run --coverage`
 
 ### Testing Notes
+
+**A new or changed encoder needs verification against an implementation that is
+not this one.** A barcode encoder can be confidently, silently wrong: it produces
+a symbol, the tests assert the bar count, and no scanner reads it. That happened
+here repeatedly — the RM4SCC bar alphabet was invented, MaxiCode's finder pattern
+overwrote its own data, Code 39's space character had the wrong pattern, EAN-8
+check digits used the wrong weights. Every one passed a full green suite.
+
+The order of preference: decode it back with zxing-wasm; failing that, compare
+module-for-module with bwip-js; failing both, document in the encoder's own
+JSDoc that it cannot be verified, the way `encodeJABCode` does. Known divergences
+live in the `DIVERGENT` map in `test/bwip-compare.test.ts` with the issue that
+tracks them, running under `it.fails` so the suite stays green while the defect
+is known and turns red the moment it is fixed.
 
 - Prefer round-trip verification over asserting on encoder internals: encode,
   decode with a third-party reader, compare. That is what caught the Data Matrix
@@ -180,10 +216,30 @@ pnpm docs:dev       # npx mdzilla ./docs
 
 ## Project Status
 
-v1-ready. The full gate (`pnpm test`) is green:
+v1. The full gate (`pnpm test`) is green:
 
-- **81 test files, 1560+ tests** passing
+- **112 test files, 2800+ tests** passing
 - **Zero** lint warnings, zero typecheck errors
-- **~95%** statement coverage
-- Every symbology reachable from the public API, the CLI and (except JAB Code)
-  PNG output
+- **95.6%** statements, **91.6%** branches — thresholds enforced in CI by
+  `vitest.config.ts`
+- Every symbology reachable from the public API, the CLI, PNG output and
+  validation
+- CI runs a Node 20/22/24 matrix plus Windows, and packs the tarball to run the
+  CLI and every entry point from a clean install
+
+**Verification status.** Every symbology is checked against an implementation
+that is not this one — decoded back with zxing-wasm or jsQR, or compared
+module-for-module with bwip-js. Two exceptions, both explicit:
+
+- **JAB Code** is not ISO/IEC 23634 conformant and cannot be verified: no
+  JavaScript or WebAssembly decoder exists and neither zxing nor BWIPP implements
+  the symbology. It is marked `@experimental` and says so in its own JSDoc.
+- **MicroPDF417** picks a smaller symbol variant than the reference for some
+  payloads. The smaller symbol decodes correctly and carries the specified error
+  correction, so this is a shape choice rather than a defect (#136); the
+  comparison keeps it visible instead of asserting it away.
+
+**Deliberate limitations**, documented where they apply: Han Xin has no GB 18030
+Chinese mode (nothing available can verify one; byte mode carries Chinese text
+meanwhile), and GS1-128 composites and the Limited/Stacked complete composite
+symbols are not assembled, though their 2D components work.
