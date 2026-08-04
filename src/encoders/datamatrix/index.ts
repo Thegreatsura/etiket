@@ -9,6 +9,7 @@ import { InvalidInputError, CapacityError } from "../../errors"
 import { encodeAuto, padCodewords } from "./encoder"
 import { maxCapacity, selectSymbolSize } from "./tables"
 import type { DataMatrixSizeOptions } from "./tables"
+import type { DataMatrixEncodeOptions } from "./encoder"
 import { generateInterleavedEC } from "./reed-solomon"
 import { placeModules } from "./placement"
 import { parseAIString, isVariableLength } from "../gs1-128"
@@ -33,13 +34,16 @@ import { parseAIString, isVariableLength } from "../gs1-128"
  * const fixed = encodeDataMatrix('Hello', { symbolSize: '26x64' })
  * ```
  */
-export function encodeDataMatrix(text: string, options: DataMatrixSizeOptions = {}): boolean[][] {
+export function encodeDataMatrix(
+  text: string,
+  options: DataMatrixSizeOptions & DataMatrixEncodeOptions = {},
+): boolean[][] {
   if (text.length === 0) {
     throw new InvalidInputError("Data Matrix input must not be empty")
   }
 
   // Step 1: Encode text to data codewords (auto-select best mode)
-  const dataCodewords = encodeAuto(text)
+  const dataCodewords = encodeAuto(text, { eci: options.eci })
 
   // Step 2: Select the smallest symbol size that fits the data
   const symbol = selectSymbolSize(dataCodewords.length, options)
