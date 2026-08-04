@@ -14,50 +14,70 @@ import { InvalidInputError } from "../errors"
 /** Bar state in a 4-state barcode */
 export type FourState = "T" | "A" | "D" | "F"
 
-// RM4SCC encoding derived from 6x6 row/col matrix per Royal Mail specification
-// Characters 0-9, A-Z are assigned sequential indices 0-35 in a 6x6 grid.
-// Each character's index → (row = floor(idx/6), col = idx%6).
-// Row and col values (0-5) each encode as 2 bar states:
-//   0=TT, 1=TA, 2=TF, 3=AT, 4=AF, 5=FT
-// So each character = row_pair + col_pair = 4 bars total.
-const ROW_COL_BARS: FourState[][] = [
-  ["T", "T"], // 0
-  ["T", "A"], // 1
-  ["T", "F"], // 2
-  ["A", "T"], // 3
-  ["A", "F"], // 4
-  ["F", "T"], // 5
+// RM4SCC / KIX bar alphabet.
+//
+// Every character is 4 bars in which exactly two carry an ascender and exactly
+// two carry a descender: the ascender pattern encodes the character's row in a
+// 6x6 grid, the descender pattern its column. The 36 patterns below are the
+// spec tables, transcribed with 0=Tracker, 1=Descender, 2=Ascender, 3=Full.
+//
+// RM4SCC and KIX share the same 36 patterns but assign them to characters in a
+// different order, so each needs its own alphabet string.
+
+const STATE_BY_DIGIT: Record<string, FourState> = { "0": "T", "1": "D", "2": "A", "3": "F" }
+
+/** RM4SCC character order — the grid position of a character is its index here */
+const RM4SCC_CHARS = "ZUVWXY501234B6789AHCDEFGNIJKLMTOPQRS"
+
+// prettier-ignore
+const RM4SCC_PATTERNS = [
+  "3300", "2211", "2301", "2310", "3201", "3210",
+  "1122", "0033", "0123", "0132", "1023", "1032",
+  "1302", "0213", "0303", "0312", "1203", "1212",
+  "1320", "0231", "0321", "0330", "1221", "1230",
+  "3102", "2013", "2103", "2112", "3003", "3012",
+  "3120", "2031", "2121", "2130", "3021", "3030",
 ]
 
-const RM4SCC_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const KIX_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
-function rm4sccEncode(ch: string): FourState[] {
-  const idx = RM4SCC_CHARS.indexOf(ch)
-  if (idx === -1) throw new InvalidInputError(`Invalid RM4SCC character: ${ch}`)
-  const row = Math.floor(idx / 6)
-  const col = idx % 6
-  return [...ROW_COL_BARS[row]!, ...ROW_COL_BARS[col]!]
+// prettier-ignore
+const KIX_PATTERNS = [
+  "0033", "0123", "0132", "1023", "1032", "1122",
+  "0213", "0303", "0312", "1203", "1212", "1302",
+  "0231", "0321", "0330", "1221", "1230", "1320",
+  "2013", "2103", "2112", "3003", "3012", "3102",
+  "2031", "2121", "2130", "3021", "3030", "3120",
+  "2211", "2301", "2310", "3201", "3210", "3300",
+]
+
+function buildTable(chars: string, patterns: readonly string[]): Record<string, FourState[]> {
+  const table: Record<string, FourState[]> = {}
+  for (let i = 0; i < chars.length; i++) {
+    table[chars[i]!] = [...patterns[i]!].map((d) => STATE_BY_DIGIT[d]!)
+  }
+  return table
 }
 
-// Build lookup table for fast access
-const RM4SCC_TABLE: Record<string, FourState[]> = {}
-for (const ch of RM4SCC_CHARS) {
-  RM4SCC_TABLE[ch] = rm4sccEncode(ch)
-}
+const RM4SCC_TABLE = buildTable(RM4SCC_CHARS, RM4SCC_PATTERNS)
+const KIX_TABLE = buildTable(KIX_CHARS, KIX_PATTERNS)
 
-/** Calculate RM4SCC check digit (modulo 6 row+col system) */
+/**
+ * Calculate the RM4SCC check character.
+ *
+ * Row and column values come from the character's position in the RM4SCC grid
+ * (i.e. its index in `RM4SCC_CHARS`), summed mod 6 each.
+ */
 function rm4sccCheckDigit(text: string): string {
   let rowSum = 0
   let colSum = 0
-  const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-  for (const ch of text.toUpperCase()) {
-    const idx = chars.indexOf(ch)
+  for (const ch of text) {
+    const idx = RM4SCC_CHARS.indexOf(ch)
     if (idx === -1) continue
     rowSum += Math.floor(idx / 6)
     colSum += idx % 6
   }
-  const checkIdx = (rowSum % 6) * 6 + (colSum % 6)
-  return chars[checkIdx]!
+  return RM4SCC_CHARS[(rowSum % 6) * 6 + (colSum % 6)]!
 }
 
 /**
@@ -105,7 +125,7 @@ export function encodeKIX(text: string): FourState[] {
   const bars: FourState[] = []
 
   for (const ch of upper) {
-    const pattern = RM4SCC_TABLE[ch]
+    const pattern = KIX_TABLE[ch]
     if (!pattern) throw new InvalidInputError(`Invalid KIX character: ${ch}`)
     bars.push(...pattern)
   }
