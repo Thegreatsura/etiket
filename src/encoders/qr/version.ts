@@ -19,8 +19,10 @@ export function getModuleCount(version: number): number {
 }
 
 /**
- * Determine the optimal encoding mode based on data content
- * Uses simple mode selection (not optimal segmentation for now)
+ * Resolve the mode for a single-segment encoding.
+ *
+ * Only used when the caller forces a mode; automatic encoding goes through the
+ * segmenter, which can mix modes within one symbol.
  */
 export function selectMode(
   text: string,

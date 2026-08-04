@@ -111,6 +111,7 @@
     "lint:fix": "oxlint . --fix && oxfmt .",
     "fmt": "oxfmt .",
     "test": "pnpm lint && pnpm typecheck && vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "docs:dev": "npx mdzilla ./docs",
     "release": "pnpm test && pnpm build && bumpp --commit --tag --push --all",

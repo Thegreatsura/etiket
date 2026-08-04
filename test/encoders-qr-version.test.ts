@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { getModuleCount, getDataCapacityBits } from "../src/encoders/qr/version"
+import { getModuleCount, getDataCapacityBits, selectMode } from "../src/encoders/qr/version"
 import { planEncoding } from "../src/encoders/qr/data"
 import type { ErrorCorrectionLevel, EncodingMode } from "../src/encoders/qr/types"
 
@@ -70,5 +70,19 @@ describe("QR version selection", () => {
       const capH = getDataCapacityBits(v, "H")
       expect(capL).toBeGreaterThan(capH)
     }
+  })
+})
+
+describe("selectMode", () => {
+  it("honours a forced mode", () => {
+    expect(selectMode("12345", "byte")).toBe("byte")
+    expect(selectMode("hello", "kanji")).toBe("kanji")
+  })
+
+  it("detects the mode when none is forced", () => {
+    expect(selectMode("12345")).toBe("numeric")
+    expect(selectMode("HELLO")).toBe("alphanumeric")
+    expect(selectMode("hello")).toBe("byte")
+    expect(selectMode("12345", "auto")).toBe("numeric")
   })
 })
