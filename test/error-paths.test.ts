@@ -86,8 +86,10 @@ describe("HIBC validation", () => {
 
 describe("ISBT 128 validation", () => {
   it("rejects a malformed donation identification number", () => {
-    expect(() => encodeISBT128DIN("X", "26", "123456")).toThrow(InvalidInputError)
-    expect(() => encodeISBT128DIN("A999", "2X", "123456")).toThrow(InvalidInputError)
+    // country code must be two uppercase letters, year two digits
+    expect(() => encodeISBT128DIN("X", "9999", "26", "123456")).toThrow(InvalidInputError)
+    expect(() => encodeISBT128DIN("US", "9999", "2X", "123456")).toThrow(InvalidInputError)
+    expect(() => encodeISBT128DIN("US", "123456", "26", "123456")).toThrow(InvalidInputError)
   })
 })
 
@@ -144,7 +146,7 @@ describe("output helpers actually run", () => {
     expect(encoded).toMatch(/^data:image\/svg\+xml;base64,/)
     // Decoding the payload gets the SVG back
     const payload = encoded.slice(encoded.indexOf(",") + 1)
-    expect(Buffer.from(payload, "base64").toString("utf8")).toContain("<svg")
+    expect(atob(payload)).toContain("<svg")
   })
 
   it("produces a data URI", () => {

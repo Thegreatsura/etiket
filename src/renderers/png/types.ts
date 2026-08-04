@@ -6,7 +6,15 @@ import { InvalidInputError } from "../../errors"
 
 export interface BarcodePNGOptions {
   /** Pixels per bar unit width (default: 2) */
+  /**
+   * Pixels per module.
+   *
+   * @deprecated Prefer `moduleSize`, which every renderer accepts. `scale`
+   * keeps working and takes precedence when both are given.
+   */
   scale?: number
+  /** Pixels per module — the name every renderer accepts */
+  moduleSize?: number
   /** Image height in pixels (default: 80) */
   height?: number
   /** Quiet zone in pixels (default: 10) */
@@ -19,7 +27,15 @@ export interface BarcodePNGOptions {
 
 export interface PostalPNGOptions {
   /** Bar width in pixels (default: 2) */
+  /**
+   * Pixels per module.
+   *
+   * @deprecated Prefer `moduleSize`, which every renderer accepts. `scale`
+   * keeps working and takes precedence when both are given.
+   */
   scale?: number
+  /** Pixels per module — the name every renderer accepts */
+  moduleSize?: number
   /** Centre-to-centre distance between bars in pixels (default: scale * 2) */
   pitch?: number
   /** Full-bar height in pixels (default: 40) */

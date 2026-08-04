@@ -93,7 +93,15 @@ export type MeasurementUnit = "px" | "mm" | "in" | "pt" | "cm"
 export interface BarcodeSVGOptions extends SVGAccessibilityOptions {
   width?: number
   height?: number
+  /**
+   * Width of one module in units.
+   *
+   * @deprecated Prefer `moduleSize`, which every renderer accepts. `barWidth`
+   * keeps working and takes precedence when both are given.
+   */
   barWidth?: number
+  /** Width of one module in units — the name every renderer accepts */
+  moduleSize?: number
   /** Measurement unit for dimensions (default 'px'). Affects SVG width/height attributes. */
   unit?: MeasurementUnit
   /** Extra spacing between bars. Each bar is narrowed by barGap/2 on each side. Default 0. */
