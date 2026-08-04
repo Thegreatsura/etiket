@@ -258,6 +258,7 @@ export function validateBarcode(text: string, type: string): { valid: boolean; e
     }
 
     case "gs1-databar":
+    case "gs1-databar-truncated":
     case "gs1-databar-limited": {
       const digits = text.replace(/\D/g, "")
       if (digits.length < 1 || digits.length > 14) {

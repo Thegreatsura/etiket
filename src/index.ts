@@ -27,6 +27,9 @@ export {
   codablockf,
   code16k,
   jabcode,
+  gs1databarStacked,
+  gs1databarStackedOmni,
+  gs1databarExpandedStacked,
 } from "./_2d"
 export { postal, postalDataURI, postalBase64, encodePostal } from "./_postal"
 export type { PostalType, PostalEncodingOptions, PostalOptions } from "./_postal"
@@ -100,6 +103,10 @@ export {
   encodeGS1DataBarOmni,
   encodeGS1DataBarLimited,
   encodeGS1DataBarExpanded,
+  encodeGS1DataBarTruncated,
+  encodeGS1DataBarStacked,
+  encodeGS1DataBarStackedOmni,
+  encodeGS1DataBarExpandedStacked,
 } from "./encoders/gs1-databar"
 export { encodeRM4SCC, encodeKIX, encodeAustraliaPost, encodeJapanPost } from "./encoders/fourstate"
 export type { FourState } from "./encoders/fourstate"
@@ -111,6 +118,7 @@ export type { MaxiCodeOptions } from "./encoders/maxicode"
 export { encodeRMQR } from "./encoders/rmqr"
 export type { RMQROptions } from "./encoders/rmqr"
 export { encodeDotCode } from "./encoders/dotcode"
+export type { DotCodeOptions } from "./encoders/dotcode"
 export { encodeHanXin } from "./encoders/hanxin"
 export type { HanXinOptions } from "./encoders/hanxin"
 export { encodeJABCode, JAB_COLORS_4, JAB_COLORS_8 } from "./encoders/jabcode"
@@ -166,6 +174,12 @@ export {
   codablockfPNG,
   codablockfPNGDataURI,
   code16kPNG,
+  gs1databarStackedPNG,
+  gs1databarStackedPNGDataURI,
+  gs1databarStackedOmniPNG,
+  gs1databarStackedOmniPNGDataURI,
+  gs1databarExpandedStackedPNG,
+  gs1databarExpandedStackedPNGDataURI,
   code16kPNGDataURI,
   maxicodePNG,
   maxicodePNGDataURI,

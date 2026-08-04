@@ -32,7 +32,12 @@ export {
   encodeGS1DataBarOmni,
   encodeGS1DataBarLimited,
   encodeGS1DataBarExpanded,
+  encodeGS1DataBarTruncated,
+  encodeGS1DataBarStacked,
+  encodeGS1DataBarStackedOmni,
+  encodeGS1DataBarExpandedStacked,
 } from "./encoders/gs1-databar"
+export { gs1databarStacked, gs1databarStackedOmni, gs1databarExpandedStacked } from "./_2d"
 export { renderBarcodeSVG } from "./renderers/svg/barcode"
 export { svgToDataURI, svgToBase64 } from "./renderers/data-uri"
 

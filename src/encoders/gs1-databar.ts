@@ -4,16 +4,21 @@
  *
  * Variants:
  * - Omnidirectional: 14-digit GTIN, omnidirectional scanning
+ * - Truncated: the Omnidirectional pattern at reduced height
+ * - Stacked: Omnidirectional split over two rows, 13 modules high
+ * - Stacked Omnidirectional: two full-height rows
  * - Limited: 14-digit GTIN starting with 0 or 1, smaller
  * - Expanded: variable-length AI data
+ * - Expanded Stacked: Expanded split over several rows
  *
- * All encode a GTIN-14 with embedded check digit.
+ * The linear variants return bar-first element widths; the stacked variants
+ * return a module matrix, one entry per module row.
  *
  * The `dbar_combins` and `dbar_getWidths` algorithms are from ISO/IEC 24724 Annex B,
  * as implemented in the zint library (BSD-3-Clause).
  */
 
-import { InvalidInputError } from "../errors"
+import { InvalidInputError, CheckDigitError } from "../errors"
 import { parseAIString } from "./gs1-128"
 
 // ─── Combinatorial Encoding Core ────────────────────────────────────────────
@@ -137,6 +142,21 @@ function interleaveWidths(
   return result
 }
 
+// ─── Element Polarity ──────────────────────────────────────────────────────
+
+/**
+ * ISO/IEC 24724 lays every DataBar symbol out starting with a one-module guard
+ * SPACE, but every 1D encoder in etiket returns bar-first arrays and both
+ * `renderBarcodeSVG` and `renderBarcodePNG` draw element 0 as a bar.
+ *
+ * Dropping that leading white module turns the ISO layout into a bar-first
+ * array without changing the rendered symbol — the module it removes is white
+ * and sits against the quiet zone.
+ */
+function barFirst(elements: number[]): number[] {
+  return elements.slice(1)
+}
+
 // ─── GTIN Check Digit ──────────────────────────────────────────────────────
 
 /** Calculate GTIN check digit (mod 10, weights 3,1 alternating from right) */
@@ -163,7 +183,7 @@ function parseGTIN(gtin: string, variant: string): string {
     // Verify check digit
     const expected = gtinCheckDigit(digits.slice(0, 13))
     if (Number.parseInt(digits[13]!, 10) !== expected) {
-      throw new InvalidInputError(
+      throw new CheckDigitError(
         `GS1 DataBar ${variant}: Invalid check digit '${digits[13]}', expecting '${expected}'`,
       )
     }
@@ -240,13 +260,24 @@ function omnGroup(val: number, outside: boolean): number {
 }
 
 /**
- * Encode GS1 DataBar Omnidirectional
- * Input: 13 or 14 digit GTIN
+ * The two halves of an Omnidirectional symbol.
  *
- * @returns Array of bar widths (alternating bar/space), 46 elements totaling 96 modules
+ * The linear symbol puts them side by side; the stacked variants put the right
+ * half on a row of its own underneath the left half.
  */
-export function encodeGS1DataBarOmni(gtin: string): number[] {
-  const digits13 = parseGTIN(gtin, "Omnidirectional")
+interface OmniHalves {
+  /** Data character 1, left finder, data character 2 — 46 modules. */
+  left: number[]
+  /** Data character 4, right finder, data character 3 — 46 modules. */
+  right: number[]
+}
+
+/**
+ * Encode a GTIN into the element widths shared by every Omnidirectional
+ * variant (Omnidirectional, Truncated, Stacked and Stacked Omnidirectional).
+ */
+function omniHalves(gtin: string, variant: string): OmniHalves {
+  const digits13 = parseGTIN(gtin, variant)
 
   // Convert 13-digit GTIN to numeric value (without check digit)
   let val = 0n
@@ -310,30 +341,40 @@ export function encodeGS1DataBarOmni(gtin: string): number[] {
   const cLeft = Math.trunc(checksum / 9)
   const cRight = checksum % 9
 
-  // Assemble 46-element total width array
-  const total: number[] = Array.from<number>({ length: 46 })
-
-  // Guards
-  total[0] = 1
-  total[1] = 1
-  total[44] = 1
-  total[45] = 1
-
-  // Data characters: 0 forward, 1 reversed, 3 forward, 2 reversed
-  for (let i = 0; i < 8; i++) {
-    total[i + 2] = dataWidths[0]![i]!
-    total[i + 15] = dataWidths[1]![7 - i]!
-    total[i + 23] = dataWidths[3]![i]!
-    total[i + 36] = dataWidths[2]![7 - i]!
+  // Data characters 1 and 4 read forward, 2 and 3 read reversed.
+  return {
+    left: [...dataWidths[0]!, ...OMN_FINDER_PATTERN[cLeft]!, ...[...dataWidths[1]!].reverse()],
+    right: [
+      ...dataWidths[3]!,
+      ...[...OMN_FINDER_PATTERN[cRight]!].reverse(),
+      ...[...dataWidths[2]!].reverse(),
+    ],
   }
+}
 
-  // Finder patterns
-  for (let i = 0; i < 5; i++) {
-    total[i + 10] = OMN_FINDER_PATTERN[cLeft]![i]!
-    total[i + 31] = OMN_FINDER_PATTERN[cRight]![4 - i]!
-  }
+/**
+ * Encode GS1 DataBar Omnidirectional
+ * Input: 13 or 14 digit GTIN
+ *
+ * @returns Array of bar widths (alternating bar/space), 45 elements totaling 95 modules
+ */
+export function encodeGS1DataBarOmni(gtin: string): number[] {
+  const { left, right } = omniHalves(gtin, "Omnidirectional")
+  return barFirst([1, 1, ...left, ...right, 1, 1])
+}
 
-  return total
+/**
+ * Encode GS1 DataBar Truncated
+ * Input: 13 or 14 digit GTIN
+ *
+ * Truncated uses exactly the Omnidirectional bar pattern; only the symbol
+ * height differs (13 modules instead of 33), which is a rendering choice.
+ *
+ * @returns Array of bar widths (alternating bar/space), 45 elements
+ */
+export function encodeGS1DataBarTruncated(gtin: string): number[] {
+  const { left, right } = omniHalves(gtin, "Truncated")
+  return barFirst([1, 1, ...left, ...right, 1, 1])
 }
 
 // ─── DataBar Limited ────────────────────────────────────────────────────────
@@ -420,7 +461,7 @@ function ltdGroup(pairVal: number): { group: number; adjustedVal: number } {
  * Encode GS1 DataBar Limited
  * Input: 13 or 14 digit GTIN starting with 0 or 1
  *
- * @returns Array of bar widths (47 elements)
+ * @returns Array of bar widths (46 elements)
  */
 export function encodeGS1DataBarLimited(gtin: string): number[] {
   const digits13 = parseGTIN(gtin, "Limited")
@@ -486,7 +527,7 @@ export function encodeGS1DataBarLimited(gtin: string): number[] {
     total[i + 30] = pairWidths[1]![i]!
   }
 
-  return total
+  return barFirst(total)
 }
 
 // ─── DataBar Expanded ───────────────────────────────────────────────────────
@@ -586,196 +627,571 @@ function appendBits(binary: number[], val: number, count: number): void {
   }
 }
 
-/**
- * Encode the binary data for GS1 DataBar Expanded.
- * Supports Method 1 (starts with AI 01) and Method 2 (general).
- * For simplicity, methods 3-14 (compressed weight/date) are encoded using method 1 or 2.
- */
-function expBinaryString(data: string): number[] {
-  const binary: number[] = []
+// ─── DataBar Expanded: general purpose field ────────────────────────────────
 
-  // Linkage flag (0 = standalone, no composite)
-  binary.push(0)
+/** Marks an FNC1 separator inside the general purpose field. */
+const EXP_FNC1 = -1
 
-  // Check if data starts with "01" (AI 01) and has at least 16 chars
-  if (data.length >= 16 && data[0] === "0" && data[1] === "1") {
-    // Method 1: (01) and possibly other AIs
-    // Header: "1"
-    appendBits(binary, 1, 1)
+/** Pattern that pads the binary string out to a whole number of characters. */
+const EXP_FILL_PATTERN = [0, 0, 1, 0, 0]
 
-    // Leading digit (position 2)
-    appendBits(binary, data.charCodeAt(2) - 48, 4)
+/** 21 data characters plus one check character, 12 bits each. */
+const EXP_MAX_BITS = 252
 
-    // Next 12 digits (positions 3-14), 3 at a time -> 10 bits
-    for (let i = 3; i < 15; i += 3) {
-      const triplet =
-        (data.charCodeAt(i) - 48) * 100 +
-        (data.charCodeAt(i + 1) - 48) * 10 +
-        (data.charCodeAt(i + 2) - 48)
-      appendBits(binary, triplet, 10)
-    }
+/** Symbol characters per row when the symbol is not stacked. */
+const EXP_SEGMENTS_LINEAR = 22
 
-    // Variable length bit field placeholder
-    // bit1: symbolChars odd? bit2: symbolChars > 14?
-    // We'll patch these after we know the symbol size
-    const patchIdx = binary.length
-    binary.push(0, 0) // placeholder
-
-    // Remaining data (after position 16) goes into general field
-    if (data.length > 16) {
-      encodeGeneralField(data, 16, binary)
-    }
-
-    // Padding and patching
-    padAndPatch(binary, patchIdx)
-  } else {
-    // Method 2: general data
-    // Header: "00"
-    appendBits(binary, 0, 2)
-
-    // Variable length bit field placeholder
-    const patchIdx = binary.length
-    binary.push(0, 0) // placeholder
-
-    // Encode all data into general field
-    encodeGeneralField(data, 0, binary)
-
-    // Padding and patching
-    padAndPatch(binary, patchIdx)
-  }
-
-  return binary
+/** One GS1 element: an AI and its value. */
+interface ExpandedField {
+  ai: string
+  value: string
+  /** Variable-length AIs need an FNC1 separator when another field follows. */
+  variable: boolean
 }
 
-/** Encode general field data using numeric, alphanumeric, and ISO 646 modes */
-function encodeGeneralField(data: string, start: number, binary: number[]): void {
-  // Use numeric mode for all-numeric data, else alphanumeric
-  let i = start
-  let mode: "numeric" | "alpha" | "iso646" = "numeric"
+/** The chosen encodation method and the fields it produced. */
+interface ExpandedEncodation {
+  /** Encodation method bits (ISO/IEC 24724 Table 9). */
+  method: string
+  /** Compressed data field. */
+  cdf: number[]
+  /** General purpose field characters; `EXP_FNC1` marks a separator. */
+  gpf: number[]
+  /** Whether a variable length symbol bit field and a general field follow. */
+  gpfAllow: boolean
+}
 
-  while (i < data.length) {
-    if (data[i] === "\x1D") {
-      // FNC1 separator
-      if (mode === "numeric") {
-        appendBits(binary, 0x0f, 4) // FNC1 in numeric mode
-      } else if (mode === "alpha") {
-        appendBits(binary, 0x0f, 5) // FNC1 in alphanumeric
+type ExpandedMode = "numeric" | "alphanumeric" | "iso646"
+
+/** Value and bit width of one encoded general field character. */
+interface CharBits {
+  value: number
+  bits: number
+}
+
+/** `count` bits of `val`, MSB first. */
+function toBits(val: number, count: number): number[] {
+  const out: number[] = []
+  appendBits(out, val, count)
+  return out
+}
+
+/** Numeric-mode digit value of a character (10 = FNC1), or null. */
+function numericValue(ch: number): number | null {
+  if (ch === EXP_FNC1) return 10
+  if (ch >= 48 && ch <= 57) return ch - 48
+  return null
+}
+
+/** 7-bit numeric-mode value for a character pair, or null when not encodable. */
+function numericPair(a: number, b: number): number | null {
+  const x = numericValue(a)
+  const y = numericValue(b)
+  if (x === null || y === null) return null
+  const v = x * 11 + y
+  return v > 119 ? null : v + 8
+}
+
+/** Alphanumeric-mode encoding of a character (Table 12), or null. */
+function alphanumericBits(ch: number): CharBits | null {
+  if (ch === EXP_FNC1) return { value: 15, bits: 5 }
+  if (ch >= 48 && ch <= 57) return { value: ch - 43, bits: 5 }
+  if (ch >= 65 && ch <= 90) return { value: ch - 33, bits: 6 }
+  if (ch === 42) return { value: 58, bits: 6 } // '*'
+  if (ch >= 44 && ch <= 47) return { value: ch + 15, bits: 6 } // ',' '-' '.' '/'
+  return null
+}
+
+/** ISO 646-mode encoding of a character (Table 13), or null. */
+function iso646Bits(ch: number): CharBits | null {
+  if (ch === EXP_FNC1) return { value: 15, bits: 5 }
+  if (ch >= 48 && ch <= 57) return { value: ch - 43, bits: 5 }
+  if (ch >= 65 && ch <= 90) return { value: ch - 1, bits: 7 }
+  if (ch >= 97 && ch <= 122) return { value: ch - 7, bits: 7 }
+  if (ch === 33 || ch === 34) return { value: ch + 199, bits: 8 } // '!' '"'
+  if (ch >= 37 && ch <= 47) return { value: ch + 197, bits: 8 } // '%'..'/'
+  if (ch >= 58 && ch <= 63) return { value: ch + 187, bits: 8 } // ':'..'?'
+  if (ch === 95) return { value: 251, bits: 8 } // '_'
+  if (ch === 32) return { value: 252, bits: 8 } // ' '
+  return null
+}
+
+/**
+ * Bits left over once the symbol is rounded up to a whole number of symbol
+ * characters (ISO/IEC 24724 7.2.5.5.3).
+ *
+ * A symbol holds at least four characters, and a stacked symbol never ends with
+ * a row containing a single character, so one more character is added when the
+ * last row would be left alone.
+ *
+ * @param total - Bits used so far, including the 12 bits of the check character
+ * @param segments - Symbol characters per row
+ */
+function expRemainingBits(total: number, segments: number): number {
+  let target = Math.max(48, Math.ceil(total / 12) * 12)
+  const symbolChars = target / 12
+  if (symbolChars % segments === 1) {
+    target = (symbolChars + 1) * 12
+  }
+  return target - total
+}
+
+/**
+ * Encode the general purpose field, switching between numeric, alphanumeric and
+ * ISO 646 modes (ISO/IEC 24724 7.2.5.5.2).
+ *
+ * @param gpf - Characters to encode; `EXP_FNC1` marks a separator
+ * @param prefixBits - Bits already used by linkage, method, VLF and the CDF,
+ *   plus the 12 bits of the check character
+ * @param segments - Symbol characters per row
+ */
+function encodeGeneralField(
+  gpf: number[],
+  prefixBits: number,
+  segments: number,
+): { bits: number[]; mode: ExpandedMode } {
+  const n = gpf.length
+
+  // Look-ahead tables: how far the run of characters encodable in each mode
+  // reaches, and how far away the next ISO 646-only character is.
+  const numericRuns = Array.from<number>({ length: n + 2 }).fill(0)
+  numericRuns[n + 1] = -1
+  const alphanumericRuns = Array.from<number>({ length: n + 1 }).fill(0)
+  const nextISO646Only = Array.from<number>({ length: n + 1 }).fill(0)
+  nextISO646Only[n] = 9999
+
+  for (let i = n - 1; i >= 0; i--) {
+    const ch = gpf[i]!
+    // A trailing digit pairs with a virtual '0', giving it a run length of 1.
+    const next = i < n - 1 ? gpf[i + 1]! : 48
+    numericRuns[i] = numericPair(ch, next) === null ? 0 : numericRuns[i + 2]! + 2
+    const alpha = alphanumericBits(ch) !== null
+    alphanumericRuns[i] = alpha ? alphanumericRuns[i + 1]! + 1 : 0
+    nextISO646Only[i] = !alpha && iso646Bits(ch) !== null ? 0 : nextISO646Only[i + 1]! + 1
+  }
+
+  const bits: number[] = []
+  let mode: ExpandedMode = "numeric"
+  let i = 0
+
+  while (i < n) {
+    const ch = gpf[i]!
+
+    if (mode === "numeric") {
+      if (i <= n - 2) {
+        const pair = numericPair(ch, gpf[i + 1]!)
+        if (pair === null) {
+          appendBits(bits, 0, 4) // latch to alphanumeric
+          mode = "alphanumeric"
+        } else {
+          appendBits(bits, pair, 7)
+          i += 2
+        }
+        continue
+      }
+      if (ch < 48 || ch > 57) {
+        appendBits(bits, 0, 4) // latch to alphanumeric
+        mode = "alphanumeric"
+        continue
+      }
+      // A single trailing digit fits in four bits when the symbol has 4 to 6
+      // bits of padding left; otherwise it is paired with an FNC1.
+      const rem = expRemainingBits(prefixBits + bits.length, segments)
+      if (rem >= 4 && rem <= 6) {
+        appendBits(bits, ch - 47, 4)
+        for (let k = 4; k < rem; k++) bits.push(0)
       } else {
-        appendBits(binary, 0x0f, 5) // FNC1 in ISO 646
+        appendBits(bits, numericPair(ch, EXP_FNC1)!, 7)
       }
       i++
       continue
     }
 
-    const ch = data.charCodeAt(i)
-
-    if (mode === "numeric") {
-      if (ch >= 48 && ch <= 57) {
-        // Check if we have a pair of digits
-        if (i + 1 < data.length && data.charCodeAt(i + 1) >= 48 && data.charCodeAt(i + 1) <= 57) {
-          const pair = (ch - 48) * 11 + (data.charCodeAt(i + 1) - 48) + 8
-          appendBits(binary, pair, 7)
-          i += 2
-        } else {
-          // Last odd digit
-          appendBits(binary, ch - 48 + 1, 4)
-          i++
-        }
-      } else {
-        // Switch to alphanumeric
-        appendBits(binary, 0, 4) // Latch to alpha
-        mode = "alpha"
+    if (mode === "alphanumeric") {
+      if (ch === EXP_FNC1) {
+        appendBits(bits, 15, 5)
+        mode = "numeric"
+        i++
+        continue
       }
-    } else if (mode === "alpha") {
-      if (ch >= 48 && ch <= 57) {
-        // Check if next two are digits - maybe switch to numeric
-        if (i + 1 < data.length && data.charCodeAt(i + 1) >= 48 && data.charCodeAt(i + 1) <= 57) {
-          appendBits(binary, 0, 3) // Latch to numeric "000"
-          mode = "numeric"
-          // Don't advance i, re-encode in numeric mode
-        } else {
-          appendBits(binary, ch - 43, 5) // Digits 0-9 -> 5-14
-          i++
-        }
-      } else if (ch >= 65 && ch <= 90) {
-        appendBits(binary, ch - 65 + 15, 5) // A=15, B=16, ..., Z=40
-        i++
-      } else if (ch === 42) {
-        // '*'
-        appendBits(binary, 41, 5)
-        i++
-      } else if (ch === 44) {
-        // ','
-        appendBits(binary, 42, 5)
-        i++
-      } else if (ch === 45) {
-        // '-'
-        appendBits(binary, 43, 5)
-        i++
-      } else if (ch === 46) {
-        // '.'
-        appendBits(binary, 44, 5)
-        i++
-      } else if (ch === 47) {
-        // '/'
-        appendBits(binary, 45, 5)
-        i++
-      } else {
-        // Switch to ISO 646 for other characters
-        appendBits(binary, 4, 5) // Latch to ISO 646
+      const alpha = alphanumericBits(ch)
+      if (alpha === null) {
+        appendBits(bits, 4, 5) // latch to ISO 646
         mode = "iso646"
+        continue
       }
-    } else {
-      // iso646 mode - 5, 7, or 8 bits per character
-      if (ch >= 48 && ch <= 57) {
-        if (i + 1 < data.length && data.charCodeAt(i + 1) >= 48 && data.charCodeAt(i + 1) <= 57) {
-          appendBits(binary, 0, 3) // Latch to numeric
-          mode = "numeric"
-        } else {
-          appendBits(binary, ch - 43, 5) // Digits: 5-14
-          i++
-        }
-      } else if (ch >= 65 && ch <= 90) {
-        appendBits(binary, ch - 65 + 15, 7) // A-Z in ISO 646
-        i++
-      } else if (ch >= 97 && ch <= 122) {
-        appendBits(binary, ch - 97 + 41, 7) // a-z
-        i++
-      } else {
-        // Other characters as 8-bit values
-        appendBits(binary, ch, 8)
-        i++
+      const run = numericRuns[i]!
+      if (run >= 6 || (run >= 4 && run + i === n)) {
+        appendBits(bits, 0, 3) // latch to numeric
+        mode = "numeric"
+        continue
       }
+      appendBits(bits, alpha.value, alpha.bits)
+      i++
+      continue
     }
+
+    if (ch === EXP_FNC1) {
+      appendBits(bits, 15, 5)
+      mode = "numeric"
+      i++
+      continue
+    }
+    if (numericRuns[i]! >= 4 && nextISO646Only[i]! >= 10) {
+      appendBits(bits, 0, 3) // latch to numeric
+      mode = "numeric"
+      continue
+    }
+    if (alphanumericRuns[i]! >= 5 && nextISO646Only[i]! >= 10) {
+      appendBits(bits, 4, 5) // latch to alphanumeric
+      mode = "alphanumeric"
+      continue
+    }
+    const iso = iso646Bits(ch)
+    if (iso === null) {
+      throw new InvalidInputError(
+        `GS1 DataBar Expanded: character '${String.fromCharCode(ch)}' is not encodable`,
+      )
+    }
+    appendBits(bits, iso.value, iso.bits)
+    i++
   }
+
+  return { bits, mode }
 }
 
-/** Pad binary data and patch variable-length bit field */
-function padAndPatch(binary: number[], patchIdx: number): void {
-  // Calculate symbol characters needed
-  let remainder = 12 - (binary.length % 12)
-  if (remainder === 12) remainder = 0
-  let symbolChars = Math.trunc((binary.length + remainder) / 12) + 1
+// ─── DataBar Expanded: encodation methods ───────────────────────────────────
 
-  if (symbolChars < 4) symbolChars = 4
+/** True when `s` is exactly `n` digits */
+function isDigits(s: string, n: number): boolean {
+  return s.length === n && /^\d+$/.test(s)
+}
 
-  remainder = 12 * (symbolChars - 1) - binary.length
+/** 12 digits as four 10-bit groups of three (ISO/IEC 24724 7.2.5.4.2) */
+function conv12to40(digits: string): number[] {
+  const out: number[] = []
+  for (let i = 0; i < 12; i += 3) {
+    appendBits(out, Number.parseInt(digits.slice(i, i + 3), 10), 10)
+  }
+  return out
+}
 
-  // Add padding
-  if (remainder > 0) {
-    // First pad with 0000 if in numeric mode end
-    appendBits(binary, 0, Math.min(4, remainder))
-    remainder -= Math.min(4, remainder)
-    // Then pad with 00100 patterns
-    while (remainder > 0) {
-      appendBits(binary, 4, Math.min(5, remainder))
-      remainder -= Math.min(5, remainder)
+/** 13 digits as a 4-bit leading digit plus four 10-bit groups */
+function conv13to44(digits: string): number[] {
+  const out: number[] = []
+  appendBits(out, digits.charCodeAt(0) - 48, 4)
+  out.push(...conv12to40(digits.slice(1)))
+  return out
+}
+
+/** General purpose field characters for the fields from `start` onwards */
+function gpfChars(fields: ExpandedField[], start: number, prefix: number[] = []): number[] {
+  const out = [...prefix]
+  for (let i = start; i < fields.length; i++) {
+    const field = fields[i]!
+    for (let k = 0; k < field.ai.length; k++) out.push(field.ai.charCodeAt(k))
+    for (let k = 0; k < field.value.length; k++) out.push(field.value.charCodeAt(k))
+    if (i !== fields.length - 1 && field.variable) out.push(EXP_FNC1)
+  }
+  return out
+}
+
+/** Character codes of a string, mapping GS to an FNC1 separator */
+function rawChars(data: string): number[] {
+  const out: number[] = []
+  for (let i = 0; i < data.length; i++) {
+    const ch = data.charCodeAt(i)
+    out.push(ch === 0x1d ? EXP_FNC1 : ch)
+  }
+  return out
+}
+
+/** Date AIs usable with the compressed weight methods, in method-bit order */
+const EXP_DATE_AIS = ["11", "13", "15", "17"]
+
+/**
+ * AI prefixes whose element length is predefined by the GS1 General
+ * Specifications (figure 7.8.6.2-1). Those elements need no FNC1 separator;
+ * every other AI does, even when its own data happens to be a fixed length.
+ */
+const EXP_PREDEFINED_LENGTH = new Set([
+  "00",
+  "01",
+  "02",
+  "03",
+  "04",
+  "11",
+  "12",
+  "13",
+  "14",
+  "15",
+  "16",
+  "17",
+  "18",
+  "19",
+  "20",
+  "31",
+  "32",
+  "33",
+  "34",
+  "35",
+  "36",
+  "41",
+])
+
+/**
+ * Pick the encodation method (ISO/IEC 24724 Table 9), preferring the compressed
+ * methods 3-14 whenever the AI sequence qualifies, since they produce the
+ * smallest symbol.
+ */
+function selectEncodation(fields: ExpandedField[]): ExpandedEncodation {
+  const ai = (i: number): string => fields[i]?.ai ?? ""
+  const value = (i: number): string => fields[i]?.value ?? ""
+  const count = fields.length
+
+  // Every compressed method needs (01) with an indicator digit of 9.
+  const gtin = ai(0) === "01" && isDigits(value(0), 14)
+  const compressible = gtin && value(0)[0] === "9"
+  const gtin12 = (): string => value(0).slice(1, 13)
+  const weight = isDigits(value(1), 6) ? Number.parseInt(value(1), 10) : -1
+
+  // Method 3: (01) + (3103) kilogram weight below 32.768 kg
+  if (compressible && count === 2 && ai(1) === "3103" && weight >= 0 && weight <= 32767) {
+    return {
+      method: "0100",
+      cdf: [...conv12to40(gtin12()), ...toBits(weight, 15)],
+      gpf: [],
+      gpfAllow: false,
     }
   }
 
-  // Patch variable-length symbol bit field
-  binary[patchIdx] = symbolChars & 1 ? 1 : 0
-  binary[patchIdx + 1] = symbolChars > 14 ? 1 : 0
+  // Method 4: (01) + (3202)/(3203) pound weight
+  if (compressible && count === 2 && ai(1) === "3202" && weight >= 0 && weight <= 9999) {
+    return {
+      method: "0101",
+      cdf: [...conv12to40(gtin12()), ...toBits(weight, 15)],
+      gpf: [],
+      gpfAllow: false,
+    }
+  }
+  if (compressible && count === 2 && ai(1) === "3203" && weight >= 0 && weight <= 22767) {
+    return {
+      method: "0101",
+      cdf: [...conv12to40(gtin12()), ...toBits(weight + 10000, 15)],
+      gpf: [],
+      gpfAllow: false,
+    }
+  }
+
+  // Methods 5-12: (01) + (310x)/(320x) weight, optionally with a date AI
+  const is310x = /^310\d$/.test(ai(1))
+  const is320x = /^320\d$/.test(ai(1))
+  if (compressible && (count === 2 || count === 3) && (is310x || is320x) && weight <= 99999) {
+    const dateIndex = count === 3 ? EXP_DATE_AIS.indexOf(ai(2)) : 0
+    const month = count === 3 ? Number.parseInt(value(2).slice(2, 4), 10) : 0
+    const day = count === 3 ? Number.parseInt(value(2).slice(4, 6), 10) : 0
+    const dateValid =
+      count === 2 ||
+      (dateIndex >= 0 && isDigits(value(2), 6) && month >= 1 && month <= 12 && day <= 31)
+
+    if (weight >= 0 && dateValid) {
+      const date =
+        count === 3
+          ? Number.parseInt(value(2).slice(0, 2), 10) * 384 + (month - 1) * 32 + day
+          : 38400 // "no date"
+      const decimal = Number.parseInt(ai(1)[3]!, 10)
+      return {
+        method: `0111${((dateIndex << 1) | (is320x ? 1 : 0)).toString(2).padStart(3, "0")}`,
+        cdf: [
+          ...conv12to40(gtin12()),
+          ...toBits(decimal * 100000 + Number.parseInt(value(1).slice(1), 10), 20),
+          ...toBits(date, 16),
+        ],
+        gpf: [],
+        gpfAllow: false,
+      }
+    }
+  }
+
+  // Method 13: (01) + (392x) price
+  if (compressible && count >= 2 && /^392[0-3]$/.test(ai(1))) {
+    return {
+      method: "01100",
+      cdf: [...conv12to40(gtin12()), ...toBits(Number.parseInt(ai(1)[3]!, 10), 2)],
+      gpf: gpfChars(fields, 2, [...rawChars(value(1)), ...(count > 2 ? [EXP_FNC1] : [])]),
+      gpfAllow: true,
+    }
+  }
+
+  // Method 14: (01) + (393x) price with an ISO 4217 currency code
+  if (compressible && count >= 2 && /^393[0-3]$/.test(ai(1)) && isDigits(value(1).slice(0, 3), 3)) {
+    return {
+      method: "01101",
+      cdf: [
+        ...conv12to40(gtin12()),
+        ...toBits(Number.parseInt(ai(1)[3]!, 10), 2),
+        ...toBits(Number.parseInt(value(1).slice(0, 3), 10), 10),
+      ],
+      gpf: gpfChars(fields, 2, [...rawChars(value(1).slice(3)), ...(count > 2 ? [EXP_FNC1] : [])]),
+      gpfAllow: true,
+    }
+  }
+
+  // Method 1: (01) followed by anything else
+  if (gtin) {
+    return {
+      method: "1",
+      cdf: conv13to44(value(0).slice(0, 13)),
+      gpf: gpfChars(fields, 1),
+      gpfAllow: true,
+    }
+  }
+
+  // Method 2: general data
+  return { method: "00", cdf: [], gpf: gpfChars(fields, 0), gpfAllow: true }
+}
+
+/** Parse the input into fields, or fall back to raw element string data */
+function expandedEncodation(data: string): ExpandedEncodation {
+  if (data.startsWith("(")) {
+    return selectEncodation(
+      parseAIString(data).map((field) => ({
+        ai: field.ai,
+        value: field.data,
+        variable: !EXP_PREDEFINED_LENGTH.has(field.ai.slice(0, 2)),
+      })),
+    )
+  }
+
+  // Raw element string: the AI boundaries are unknown, so only a leading (01)
+  // can be compressed and everything after it goes through the general field.
+  if (data.length >= 16 && data.startsWith("01") && isDigits(data.slice(2, 16), 14)) {
+    return {
+      method: "1",
+      cdf: conv13to44(data.slice(2, 15)),
+      gpf: rawChars(data.slice(16)),
+      gpfAllow: true,
+    }
+  }
+  return { method: "00", cdf: [], gpf: rawChars(data), gpfAllow: true }
+}
+
+/**
+ * Build the binary string of a GS1 DataBar Expanded symbol: linkage flag,
+ * encodation method, variable length symbol bit field, compressed data field,
+ * general purpose field and padding (ISO/IEC 24724 7.2.5).
+ */
+function expBinaryString(data: string, segments: number): number[] {
+  const encodation = expandedEncodation(data)
+  const vlfBits = encodation.gpfAllow ? 2 : 0
+
+  // The check character occupies a symbol character of its own, so its 12 bits
+  // count towards the symbol size while the padding is worked out.
+  const prefix = 13 + encodation.method.length + vlfBits + encodation.cdf.length
+  const { bits: gpf, mode } = encodeGeneralField(encodation.gpf, prefix, segments)
+
+  const used = prefix + gpf.length
+  const padLength = expRemainingBits(used, segments)
+  const symbolChars = (used + padLength) / 12
+
+  const binary: number[] = [0] // linkage flag: standalone, no composite
+  for (const bit of encodation.method) binary.push(bit === "1" ? 1 : 0)
+  if (encodation.gpfAllow) {
+    binary.push(symbolChars & 1, symbolChars > 14 ? 1 : 0)
+  }
+  binary.push(...encodation.cdf, ...gpf)
+
+  // Padding latches out of numeric mode first, then repeats the fill pattern.
+  const pad: number[] = mode === "numeric" ? [0, 0, 0, 0] : []
+  for (let i = 0; pad.length < padLength; i++) pad.push(EXP_FILL_PATTERN[i % 5]!)
+  pad.length = padLength
+  binary.push(...pad)
+
+  if (binary.length > EXP_MAX_BITS) {
+    throw new InvalidInputError("GS1 DataBar Expanded: data too long for a single symbol")
+  }
+  return binary
+}
+
+// ─── DataBar Expanded: symbol characters ────────────────────────────────────
+
+/** Element widths of an Expanded symbol, ready to be laid out. */
+interface ExpandedSymbol {
+  /** Symbol characters, check character first, in rendering order. */
+  chars: number[][]
+  /** Finder patterns, one per pair of symbol characters. */
+  finders: number[][]
+}
+
+/** Encode a 12-bit value as the eight element widths of a symbol character */
+function expCharWidths(value: number): number[] {
+  const group = expGroup(value)
+  const odd = Math.trunc((value - EXP_G_SUM[group]!) / EXP_T_EVEN[group]!)
+  const even = (value - EXP_G_SUM[group]!) % EXP_T_EVEN[group]!
+  return interleaveWidths(
+    odd,
+    even,
+    EXP_MODULES[group]!,
+    17 - EXP_MODULES[group]!,
+    4,
+    EXP_WIDEST[group]!,
+    true,
+  )
+}
+
+/**
+ * Encode GS1 DataBar Expanded data into symbol characters and finder patterns.
+ *
+ * @param data - GS1 AI string in parenthesized format, or raw element string
+ * @param segments - Symbol characters per row (22 when the symbol is not stacked)
+ */
+function expandedSymbol(data: string, segments: number): ExpandedSymbol {
+  const binary = expBinaryString(data, segments)
+  const dataChars = binary.length / 12
+
+  const dataWidths: number[][] = []
+  for (let i = 0; i < dataChars; i++) {
+    let value = 0
+    for (let j = 0; j < 12; j++) {
+      if (binary[i * 12 + j]) value |= 0x800 >> j
+    }
+    dataWidths.push(expCharWidths(value))
+  }
+
+  // Checksum (7.2.6): each data character is weighted by the row of Table 14
+  // that its position in the finder sequence selects.
+  let checksum = 0
+  const weightRow = EXP_WEIGHT_ROWS[Math.trunc((dataChars - 2) / 2)]!
+  for (let i = 0; i < dataChars; i++) {
+    const row = EXP_CHECKSUM_WEIGHT[weightRow[i]!]!
+    for (let j = 0; j < 8; j++) checksum += dataWidths[i]![j]! * row[j]!
+  }
+  const checkValue = 211 * (dataChars - 3) + (checksum % 211)
+
+  // Alternate characters are laid out in reverse; the check character leads.
+  const chars: number[][] = [expCharWidths(checkValue)]
+  for (let i = 0; i < dataChars; i++) {
+    chars.push(i % 2 === 0 ? [...dataWidths[i]!].reverse() : dataWidths[i]!)
+  }
+
+  const sequence = EXP_FINDER_SEQUENCE[Math.trunc((dataChars - 2) / 2)]!
+  const finders = sequence.map((index) => EXP_FINDER_PATTERN[index - 1]!)
+
+  return { chars, finders }
+}
+
+/**
+ * Lay out one row of Expanded symbol characters as element widths, in the
+ * ISO/IEC 24724 space-first order.
+ */
+function expRowElements(symbol: ExpandedSymbol, start: number, end: number): number[] {
+  const elements: number[] = [1, 1]
+  for (let pos = start; pos < end; pos++) {
+    elements.push(...symbol.chars[pos]!)
+    if (pos % 2 === 0) elements.push(...symbol.finders[pos / 2]!)
+  }
+  elements.push(1, 1)
+  return elements
 }
 
 /**
@@ -788,115 +1204,247 @@ export function encodeGS1DataBarExpanded(data: string): number[] {
   if (data.length === 0) {
     throw new InvalidInputError("GS1 DataBar Expanded: data must not be empty")
   }
+  const symbol = expandedSymbol(data, EXP_SEGMENTS_LINEAR)
+  return barFirst(expRowElements(symbol, 0, symbol.chars.length))
+}
 
-  // Parse AI-formatted input -- strip parentheses and validate AI structure
-  let payload = data
-  if (data.startsWith("(")) {
-    const fields = parseAIString(data) // throws on invalid AI syntax
-    payload = fields.map((f) => f.ai + f.data).join("")
+// ─── Stacked Variants ───────────────────────────────────────────────────────
+
+/** Width of every Omnidirectional-family stacked row, in modules. */
+const OMN_STACKED_WIDTH = 50
+
+/** Row height of a Stacked Omnidirectional data row, in modules. */
+const OMN_STACKED_OMNI_HEIGHT = 33
+
+/** Row height of an Expanded Stacked data row, in modules. */
+const EXP_STACKED_HEIGHT = 34
+
+/** Default symbol characters per Expanded Stacked row. */
+const EXP_STACKED_SEGMENTS = 4
+
+/** Bottom-row finder pattern that gets the fixed separator of ISO/IEC 24724 */
+const OMN_F3_PATTERN = [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1]
+
+/** Separator drawn under that finder pattern */
+const OMN_FINDER_SEPARATOR = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0]
+
+/** Expand alternating element widths into one module per unit width. */
+function elementsToModules(elements: number[], startsWithBar: boolean): number[] {
+  const modules: number[] = []
+  let bar = startsWithBar
+  for (const width of elements) {
+    for (let i = 0; i < width; i++) modules.push(bar ? 1 : 0)
+    bar = !bar
+  }
+  return modules
+}
+
+/** Append `count` copies of a module row to a matrix. */
+function pushRow(matrix: boolean[][], row: number[], count = 1): void {
+  for (let i = 0; i < count; i++) matrix.push(row.map((module) => module === 1))
+}
+
+/**
+ * Blank the four modules at each end of a separator, which always stay light
+ * (ISO/IEC 24724 4.3.2).
+ */
+function padSeparator(separator: number[]): void {
+  separator.fill(0, 0, 4)
+  separator.fill(0, separator.length - 4, separator.length)
+}
+
+/**
+ * Fill the part of a separator that runs alongside a finder pattern: a dark
+ * module is never repeated under a dark module, so the pattern alternates
+ * instead of simply inverting the row (ISO/IEC 24724 4.3.2).
+ */
+function finderSeparator(row: number[], separator: number[], from: number, to: number): void {
+  for (let i = from; i <= to; i++) {
+    if (row[i] !== 0) {
+      separator[i] = 0
+    } else if (row[i - 1] === 1) {
+      separator[i] = 1
+    } else {
+      separator[i] = separator[i - 1] === 0 ? 1 : 0
+    }
+  }
+}
+
+/**
+ * Top and bottom rows of a stacked Omnidirectional symbol.
+ *
+ * The left half keeps the polarity of the linear symbol, which starts on a
+ * space; the right half continues it, so its row starts on a bar.
+ */
+function omniStackedRows(gtin: string, variant: string): { top: number[]; bottom: number[] } {
+  const { left, right } = omniHalves(gtin, variant)
+  return {
+    top: elementsToModules([1, 1, ...left, 1, 1], false),
+    bottom: elementsToModules([1, 1, ...right, 1, 1], true),
+  }
+}
+
+/**
+ * Encode GS1 DataBar Stacked
+ * Input: 13 or 14 digit GTIN
+ *
+ * Two rows of 50 modules joined by a one-module separator, 13 modules high in
+ * total. Used where a linear symbol does not fit.
+ *
+ * @returns Module matrix, one row per module row
+ */
+export function encodeGS1DataBarStacked(gtin: string): boolean[][] {
+  const { top, bottom } = omniStackedRows(gtin, "Stacked")
+
+  const separator = Array.from<number>({ length: OMN_STACKED_WIDTH }).fill(0)
+  for (let i = 1; i < OMN_STACKED_WIDTH; i++) {
+    separator[i] = top[i] === bottom[i] ? 1 - top[i]! : 1 - separator[i - 1]!
+  }
+  padSeparator(separator)
+
+  const matrix: boolean[][] = []
+  pushRow(matrix, top, 5)
+  pushRow(matrix, separator)
+  pushRow(matrix, bottom, 7)
+  return matrix
+}
+
+/**
+ * Encode GS1 DataBar Stacked Omnidirectional
+ * Input: 13 or 14 digit GTIN
+ *
+ * Two full-height rows separated by a three-module separator, so the symbol
+ * still scans omnidirectionally. Common on retail produce.
+ *
+ * @returns Module matrix, one row per module row
+ */
+export function encodeGS1DataBarStackedOmni(gtin: string): boolean[][] {
+  const { top, bottom } = omniStackedRows(gtin, "Stacked Omnidirectional")
+
+  const above = top.map((module) => 1 - module)
+  padSeparator(above)
+  finderSeparator(top, above, 18, 30)
+
+  // The middle separator alternates across the whole symbol width.
+  const middle = Array.from<number>({ length: OMN_STACKED_WIDTH }).fill(0)
+  for (let i = 4; i < OMN_STACKED_WIDTH - 4; i++) middle[i] = i % 2
+  padSeparator(middle)
+
+  const below = bottom.map((module) => 1 - module)
+  padSeparator(below)
+  finderSeparator(bottom, below, 19, 31)
+  if (OMN_F3_PATTERN.every((module, i) => bottom[i + 19] === module)) {
+    for (let i = 0; i < OMN_FINDER_SEPARATOR.length; i++) {
+      below[i + 19] = OMN_FINDER_SEPARATOR[i]!
+    }
   }
 
-  // Generate binary string
-  const binary = expBinaryString(payload)
+  const matrix: boolean[][] = []
+  pushRow(matrix, top, OMN_STACKED_OMNI_HEIGHT)
+  pushRow(matrix, above)
+  pushRow(matrix, middle)
+  pushRow(matrix, below)
+  pushRow(matrix, bottom, OMN_STACKED_OMNI_HEIGHT)
+  return matrix
+}
 
-  // Calculate data characters from binary
-  const dataChars = Math.trunc(binary.length / 12)
-  const symbolChars = dataChars + 1 // Plus check char
+/** Module positions of the finder patterns within an Expanded Stacked row */
+function expFinderPositions(width: number): number[] {
+  const positions: number[] = []
+  // A pair of symbol characters plus its finder spans 49 modules, and the
+  // second finder of a four-character row sits 49 modules after the first.
+  for (let i = 19; i <= width - 13; i += 98) positions.push(i)
+  for (let i = 68; i <= width - 13; i += 98) positions.push(i)
+  return positions
+}
 
-  // Encode each 12-bit segment to element widths
-  const charWidths: number[][] = []
-  for (let i = 0; i < dataChars; i++) {
-    let vs = 0
-    for (let j = 0; j < 12; j++) {
-      if (binary[i * 12 + j]) {
-        vs |= 0x800 >> j
-      }
-    }
-
-    const group = expGroup(vs)
-    const odd = Math.trunc((vs - EXP_G_SUM[group]!) / EXP_T_EVEN[group]!)
-    const even = (vs - EXP_G_SUM[group]!) % EXP_T_EVEN[group]!
-
-    charWidths.push(
-      interleaveWidths(
-        odd,
-        even,
-        EXP_MODULES[group]!,
-        17 - EXP_MODULES[group]!,
-        4,
-        EXP_WIDEST[group]!,
-        true,
-      ),
+/**
+ * Encode GS1 DataBar Expanded Stacked
+ * Input: GS1 AI string in parenthesized format or raw AI data
+ *
+ * Splits an Expanded symbol over several rows of `segments` symbol characters,
+ * each row 34 modules high and joined by three separator rows. The workhorse of
+ * variable-weight produce labelling.
+ *
+ * @param data - GS1 AI string in parenthesized format, or raw element string
+ * @param options.segments - Symbol characters per row, even, 2 to 22 (default 4)
+ * @returns Module matrix, one row per module row
+ */
+export function encodeGS1DataBarExpandedStacked(
+  data: string,
+  options: { segments?: number } = {},
+): boolean[][] {
+  if (data.length === 0) {
+    throw new InvalidInputError("GS1 DataBar Expanded Stacked: data must not be empty")
+  }
+  const segments = options.segments ?? EXP_STACKED_SEGMENTS
+  if (segments < 2 || segments > 22 || segments % 2 !== 0) {
+    throw new InvalidInputError(
+      "GS1 DataBar Expanded Stacked: segments must be an even number from 2 to 22",
     )
   }
 
-  // Calculate checksum (7.2.6)
-  let checksum = 0
-  const weightRowIdx = Math.trunc((dataChars - 2) / 2)
+  const symbol = expandedSymbol(data, segments)
+  const rowCount = Math.ceil(symbol.chars.length / segments)
 
-  for (let i = 0; i < dataChars; i++) {
-    const row = EXP_WEIGHT_ROWS[weightRowIdx]![i]!
-    for (let j = 0; j < 8; j++) {
-      checksum += charWidths[i]![j]! * EXP_CHECKSUM_WEIGHT[row]![j]!
+  const rows: number[][] = []
+  const separators: number[][] = []
+
+  for (let r = 0; r < rowCount; r++) {
+    const elements = expRowElements(
+      symbol,
+      r * segments,
+      Math.min((r + 1) * segments, symbol.chars.length),
+    )
+    // With an odd number of character pairs per row every other row starts on a
+    // bar rather than a space.
+    let row = elementsToModules(elements, segments % 4 !== 0 && r % 2 === 1)
+
+    let separator = row.map((module) => 1 - module)
+    const finders = expFinderPositions(row.length)
+    for (const position of finders) finderSeparator(row, separator, position, position + 14)
+    padSeparator(separator)
+
+    // Rows alternate direction so that adjacent finder patterns do not line up.
+    if (segments % 4 === 0 && r % 2 === 1) {
+      if (row.length !== rows[0]!.length && finders.length % 2 === 1) {
+        row = [0, ...row]
+        separator = [0, ...separator]
+      } else {
+        row = [...row].reverse()
+        separator = [...separator].reverse()
+      }
+    }
+
+    rows.push(row)
+    separators.push(separator)
+  }
+
+  // A short final row is padded with light modules.
+  const width = rows[0]!.length
+  const last = rows.length - 1
+  rows[last] = [
+    ...rows[last]!,
+    ...Array.from<number>({ length: width - rows[last]!.length }).fill(0),
+  ]
+  separators[last] = [
+    ...separators[last]!,
+    ...Array.from<number>({ length: width - separators[last]!.length }).fill(0),
+  ]
+
+  // The separator drawn between two rows alternates across the symbol width.
+  const between = Array.from<number>({ length: width }).fill(0)
+  for (let i = 0; i < width; i++) between[i] = i % 2
+  padSeparator(between)
+
+  const matrix: boolean[][] = []
+  for (let r = 0; r < rows.length; r++) {
+    if (r !== 0) pushRow(matrix, separators[r]!)
+    pushRow(matrix, rows[r]!, EXP_STACKED_HEIGHT)
+    if (r !== rows.length - 1) {
+      pushRow(matrix, separators[r]!)
+      pushRow(matrix, between)
     }
   }
-
-  const checkChar = 211 * (symbolChars - 4) + (checksum % 211)
-
-  const checkGroup = expGroup(checkChar)
-  const checkOdd = Math.trunc((checkChar - EXP_G_SUM[checkGroup]!) / EXP_T_EVEN[checkGroup]!)
-  const checkEven = (checkChar - EXP_G_SUM[checkGroup]!) % EXP_T_EVEN[checkGroup]!
-
-  const checkWidths = interleaveWidths(
-    checkOdd,
-    checkEven,
-    EXP_MODULES[checkGroup]!,
-    17 - EXP_MODULES[checkGroup]!,
-    4,
-    EXP_WIDEST[checkGroup]!,
-    true,
-  )
-
-  // Assemble element array
-  const codeblocks = Math.trunc((symbolChars + 1) / 2)
-  const patternWidth = codeblocks * 5 + symbolChars * 8 + 4
-  const elements: number[] = Array.from<number>({ length: patternWidth }).fill(0)
-
-  // Put finder patterns in element array
-  const p = Math.trunc((symbolChars - 1) / 2) - 1
-  for (let i = 0; i < codeblocks; i++) {
-    const k = EXP_FINDER_SEQUENCE[p]![i]! - 1
-    for (let j = 0; j < 5; j++) {
-      elements[21 * i + j + 10] = EXP_FINDER_PATTERN[k]![j]!
-    }
-  }
-
-  // Put check character in element array
-  for (let i = 0; i < 8; i++) {
-    elements[i + 2] = checkWidths[i]!
-  }
-
-  // Put forward reading data characters (odd-indexed: 1, 3, 5, ...)
-  for (let i = 1; i < dataChars; i += 2) {
-    const k = Math.trunc((i - 1) / 2) * 21 + 23
-    for (let j = 0; j < 8; j++) {
-      elements[k + j] = charWidths[i]![j]!
-    }
-  }
-
-  // Put reversed data characters (even-indexed: 0, 2, 4, ...)
-  for (let i = 0; i < dataChars; i += 2) {
-    const k = Math.trunc(i / 2) * 21 + 15
-    for (let j = 0; j < 8; j++) {
-      elements[k + j] = charWidths[i]![7 - j]!
-    }
-  }
-
-  // Set guards
-  elements[0] = 1
-  elements[1] = 1
-  elements[patternWidth - 2] = 1
-  elements[patternWidth - 1] = 1
-
-  return elements
+  return matrix
 }

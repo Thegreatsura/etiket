@@ -82,10 +82,6 @@ const DIVERGENT: Record<string, string> = {
     "differs: etiket picks 1x11 where BWIPP picks 1x14 for the same data; where both pick " +
     "the same variant the module pattern is identical",
 
-  dotcode:
-    "#101 — no dot-placement or masking algorithm: symbol sizes disagree and, where they " +
-    "agree, every row differs (etiket also leaves the last rows completely blank)",
-
   hanxin:
     "#102 — the symbol size agrees (23x23) but only the fixed finder patterns match; every " +
     "data row differs (no masking, no function information, invented capacity)",

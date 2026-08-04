@@ -42,6 +42,7 @@ export type BarcodeType =
   | "gs1-databar"
   | "gs1-databar-limited"
   | "gs1-databar-expanded"
+  | "gs1-databar-truncated"
 
 export interface BarcodeEncodingOptions {
   type?: BarcodeType

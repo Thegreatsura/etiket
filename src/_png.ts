@@ -15,9 +15,15 @@ import { encodeMicroQR } from "./encoders/qr/micro"
 import { encodeRMQR } from "./encoders/rmqr"
 import { encodeHanXin } from "./encoders/hanxin"
 import { encodeDotCode } from "./encoders/dotcode"
+import type { DotCodeOptions } from "./encoders/dotcode"
 import { encodeMicroPDF417 } from "./encoders/micropdf417"
 import { encodeCodablockF } from "./encoders/codablock-f"
 import { encodeCode16K } from "./encoders/code16k"
+import {
+  encodeGS1DataBarStacked,
+  encodeGS1DataBarStackedOmni,
+  encodeGS1DataBarExpandedStacked,
+} from "./encoders/gs1-databar"
 import { encodeMaxiCode } from "./encoders/maxicode"
 import {
   renderBarcodePNG,
@@ -232,14 +238,18 @@ export function hanxinPNGDataURI(text: string, options?: HanXinOptions & MatrixP
 /**
  * Generate a DotCode symbol as PNG
  */
-export function dotcodePNG(text: string, options?: MatrixPNGOptions): Uint8Array {
-  return renderMatrixPNG(encodeDotCode(text), options)
+export function dotcodePNG(text: string, options?: DotCodeOptions & MatrixPNGOptions): Uint8Array {
+  const { rows, columns, mask, ...pngOpts } = options ?? {}
+  return renderMatrixPNG(encodeDotCode(text, { rows, columns, mask }), pngOpts)
 }
 
 /**
  * Generate a DotCode symbol as PNG data URI
  */
-export function dotcodePNGDataURI(text: string, options?: MatrixPNGOptions): string {
+export function dotcodePNGDataURI(
+  text: string,
+  options?: DotCodeOptions & MatrixPNGOptions,
+): string {
   return toPNGDataURI(dotcodePNG(text, options))
 }
 
@@ -341,4 +351,46 @@ export function maxicodePNGDataURI(
   options?: MaxiCodeOptions & MatrixPNGOptions,
 ): string {
   return toPNGDataURI(maxicodePNG(text, options))
+}
+
+/**
+ * Generate a GS1 DataBar Stacked symbol as PNG.
+ *
+ * The stacked DataBar variants return a full module matrix, so they rasterize
+ * at the default square module height.
+ */
+export function gs1databarStackedPNG(text: string, options?: MatrixPNGOptions): Uint8Array {
+  return renderMatrixPNG(encodeGS1DataBarStacked(text), options)
+}
+
+/** Generate a GS1 DataBar Stacked symbol as PNG data URI */
+export function gs1databarStackedPNGDataURI(text: string, options?: MatrixPNGOptions): string {
+  return toPNGDataURI(gs1databarStackedPNG(text, options))
+}
+
+/** Generate a GS1 DataBar Stacked Omnidirectional symbol as PNG */
+export function gs1databarStackedOmniPNG(text: string, options?: MatrixPNGOptions): Uint8Array {
+  return renderMatrixPNG(encodeGS1DataBarStackedOmni(text), options)
+}
+
+/** Generate a GS1 DataBar Stacked Omnidirectional symbol as PNG data URI */
+export function gs1databarStackedOmniPNGDataURI(text: string, options?: MatrixPNGOptions): string {
+  return toPNGDataURI(gs1databarStackedOmniPNG(text, options))
+}
+
+/** Generate a GS1 DataBar Expanded Stacked symbol as PNG */
+export function gs1databarExpandedStackedPNG(
+  text: string,
+  options?: { segments?: number } & MatrixPNGOptions,
+): Uint8Array {
+  const { segments, ...pngOpts } = options ?? {}
+  return renderMatrixPNG(encodeGS1DataBarExpandedStacked(text, { segments }), pngOpts)
+}
+
+/** Generate a GS1 DataBar Expanded Stacked symbol as PNG data URI */
+export function gs1databarExpandedStackedPNGDataURI(
+  text: string,
+  options?: { segments?: number } & MatrixPNGOptions,
+): string {
+  return toPNGDataURI(gs1databarExpandedStackedPNG(text, options))
 }

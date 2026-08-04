@@ -247,80 +247,40 @@ describe("Code 39 space character", () => {
 })
 
 /**
- * GS1 DataBar round-trip.
- *
- * `encodeGS1DataBarOmni` / `Limited` / `Expanded` return element arrays whose first
- * element is a SPACE. Every other 1D encoder in etiket — and `renderBarcodeSVG` /
- * `renderBarcodePNG`, which both draw element 0 as a bar — assume bar-first, so the
- * symbols etiket actually renders have inverted polarity and no reader accepts them.
- * That is the `it.fails` case below; no issue is filed for it yet.
- *
- * Rendering the same arrays space-first reproduces, module for module, the pattern
- * zxing's own DataBar writer emits, which is how the tests below verify that the
- * Omnidirectional and Limited element widths themselves are correct.
+ * GS1 DataBar round-trip. The encoders return bar-first element arrays like
+ * every other 1D encoder (#138). Full coverage — the Expanded encodation
+ * methods, Truncated and the stacked variants — lives in
+ * test/encoders-gs1-databar-roundtrip.test.ts.
  */
 describe("GS1 DataBar round-trip", () => {
-  it.fails("decodes Omnidirectional as etiket renders it (bar-first)", async () => {
-    const result = await decode1DResult(encodeGS1DataBarOmni("01234567890128"))
-    expect(result?.text).toBe("(01)01234567890128")
-  })
-
-  it("decodes Omnidirectional when rendered space-first", async () => {
-    const result = await decode1DResult(encodeGS1DataBarOmni("01234567890128"), {
-      spaceFirst: true,
+  it("decodes Omnidirectional", async () => {
+    expect(await decode1DResult(encodeGS1DataBarOmni("01234567890128"))).toEqual({
+      format: "DataBarOmni",
+      text: "(01)01234567890128",
     })
-    expect(result).toEqual({ format: "DataBarOmni", text: "(01)01234567890128" })
   })
 
-  it("decodes a second Omnidirectional GTIN when rendered space-first", async () => {
-    const result = await decode1DResult(encodeGS1DataBarOmni("5901234123457"), {
-      spaceFirst: true,
+  it("decodes a second Omnidirectional GTIN", async () => {
+    expect((await decode1DResult(encodeGS1DataBarOmni("5901234123457")))?.text).toBe(
+      "(01)59012341234576",
+    )
+  })
+
+  it("decodes Limited", async () => {
+    expect(await decode1DResult(encodeGS1DataBarLimited("01234567890128"))).toEqual({
+      format: "DataBarLtd",
+      text: "(01)01234567890128",
     })
-    expect(result?.text).toBe("(01)59012341234576")
   })
 
-  it.fails("decodes Limited as etiket renders it (bar-first)", async () => {
-    const result = await decode1DResult(encodeGS1DataBarLimited("01234567890128"))
-    expect(result?.text).toBe("(01)01234567890128")
-  })
-
-  it("decodes Limited when rendered space-first", async () => {
-    const result = await decode1DResult(encodeGS1DataBarLimited("01234567890128"), {
-      spaceFirst: true,
+  it("decodes Expanded", async () => {
+    expect(await decode1DResult(encodeGS1DataBarExpanded("(01)90012345678908"))).toEqual({
+      format: "DataBarExp",
+      text: "(01)90012345678908",
     })
-    expect(result).toEqual({ format: "DataBarLtd", text: "(01)01234567890128" })
   })
 
-  it.fails("decodes Expanded as etiket renders it (bar-first)", async () => {
-    const result = await decode1DResult(encodeGS1DataBarExpanded("(01)90012345678908"))
-    expect(result?.text).toBe("(01)90012345678908")
-  })
-
-  it("produces a structurally valid Expanded symbol when rendered space-first", async () => {
-    const result = await decode1DResult(encodeGS1DataBarExpanded("(01)90012345678908"), {
-      spaceFirst: true,
-    })
-    expect(result?.format).toBe("DataBarExp")
-  })
-
-  /**
-   * Second, independent Expanded defect (also unfiled): even with the polarity
-   * corrected the payload comes back corrupted — `(01)90012345678908` decodes as
-   * `(01)40049382234908`, and `(10)ABC123` decodes as `10<GS>5308317`. The variable
-   * length symbol data is mis-packed, so the general-purpose encodation of AI data
-   * is wrong, independently of issue #113 (encodation methods 3-14).
-   */
-  it.fails("round-trips the Expanded payload when rendered space-first", async () => {
-    const result = await decode1DResult(encodeGS1DataBarExpanded("(01)90012345678908"), {
-      spaceFirst: true,
-    })
-    expect(result?.text).toBe("(01)90012345678908")
-  })
-
-  it.fails("round-trips a non-GTIN Expanded payload when rendered space-first", async () => {
-    const result = await decode1DResult(encodeGS1DataBarExpanded("(10)ABC123"), {
-      spaceFirst: true,
-    })
-    expect(result?.text).toContain("ABC123")
+  it("round-trips a non-GTIN Expanded payload", async () => {
+    expect((await decode1DResult(encodeGS1DataBarExpanded("(10)ABC123")))?.text).toBe("(10)ABC123")
   })
 })

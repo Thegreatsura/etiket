@@ -11,10 +11,16 @@ import { encodeMicroQR } from "./encoders/qr/micro"
 import { encodeRMQR } from "./encoders/rmqr"
 import { encodeMaxiCode } from "./encoders/maxicode"
 import { encodeDotCode } from "./encoders/dotcode"
+import type { DotCodeOptions } from "./encoders/dotcode"
 import { encodeHanXin } from "./encoders/hanxin"
 import { encodeCodablockF } from "./encoders/codablock-f"
 import { encodeCode16K } from "./encoders/code16k"
 import { encodeJABCode } from "./encoders/jabcode"
+import {
+  encodeGS1DataBarStacked,
+  encodeGS1DataBarStackedOmni,
+  encodeGS1DataBarExpandedStacked,
+} from "./encoders/gs1-databar"
 import { renderMatrixSVG, renderMaxiCodeSVG } from "./renderers/svg/matrix"
 import { renderColorMatrixSVG } from "./renderers/svg/color-matrix"
 import type { MatrixSVGOptions } from "./renderers/svg/matrix"
@@ -113,8 +119,9 @@ export function maxicode(text: string, options: MaxiCodeOptions & MatrixSVGOptio
 /**
  * Generate a DotCode symbol as SVG string
  */
-export function dotcode(text: string, options: MatrixSVGOptions = {}): string {
-  return renderMatrixSVG(encodeDotCode(text), options)
+export function dotcode(text: string, options: DotCodeOptions & MatrixSVGOptions = {}): string {
+  const { rows, columns, mask, ...svgOpts } = options
+  return renderMatrixSVG(encodeDotCode(text, { rows, columns, mask }), svgOpts)
 }
 
 /**
@@ -182,6 +189,34 @@ export function code16k(text: string, options: MatrixSVGOptions = {}): string {
     ...options,
     rowHeights: stackedRowHeights(result, options.rowHeight ?? 8),
   })
+}
+
+/**
+ * Generate a GS1 DataBar Stacked symbol as SVG string.
+ *
+ * The stacked DataBar variants return a full module matrix, so they render at
+ * the default square module height rather than a stacked row height.
+ */
+export function gs1databarStacked(text: string, options: MatrixSVGOptions = {}): string {
+  return renderMatrixSVG(encodeGS1DataBarStacked(text), options)
+}
+
+/**
+ * Generate a GS1 DataBar Stacked Omnidirectional symbol as SVG string
+ */
+export function gs1databarStackedOmni(text: string, options: MatrixSVGOptions = {}): string {
+  return renderMatrixSVG(encodeGS1DataBarStackedOmni(text), options)
+}
+
+/**
+ * Generate a GS1 DataBar Expanded Stacked symbol as SVG string
+ */
+export function gs1databarExpandedStacked(
+  text: string,
+  options: { segments?: number } & MatrixSVGOptions = {},
+): string {
+  const { segments, ...svgOpts } = options
+  return renderMatrixSVG(encodeGS1DataBarExpandedStacked(text, { segments }), svgOpts)
 }
 
 /**
