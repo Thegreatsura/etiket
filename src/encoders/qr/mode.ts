@@ -3,6 +3,7 @@
  */
 
 import { InvalidInputError } from "../../errors"
+import { isKanjiChar, toShiftJIS } from "./kanji"
 
 import { ALPHANUMERIC_CHARS } from "./tables"
 
@@ -19,17 +20,20 @@ export function isAlphanumeric(text: string): boolean {
   return true
 }
 
-/** Check if a string can be encoded in Kanji mode (Shift JIS double-byte) */
-export function isKanji(_text: string): boolean {
-  // Kanji detection requires checking Shift JIS encoding ranges
-  // For now, return false - users can explicitly set kanji mode
-  return false
+/** Check if a string can be encoded in Kanji mode (Shift-JIS double byte) */
+export function isKanji(text: string): boolean {
+  if (text.length === 0) return false
+  for (const char of text) {
+    if (!isKanjiChar(char)) return false
+  }
+  return true
 }
 
 /** Auto-detect the best encoding mode for the given text */
 export function detectMode(text: string): "numeric" | "alphanumeric" | "byte" | "kanji" {
   if (isNumeric(text)) return "numeric"
   if (isAlphanumeric(text)) return "alphanumeric"
+  if (isKanji(text)) return "kanji"
   return "byte"
 }
 
@@ -121,29 +125,22 @@ export function encodeKanjiData(sjisValues: number[]): number[] {
 }
 
 /**
- * Convert a Unicode string to Shift JIS double-byte values for Kanji encoding.
- * This is a simplified mapping — covers common CJK characters.
- * For full support, a complete Unicode-to-SJIS table would be needed.
+ * Convert a Unicode string to the Shift-JIS values kanji mode encodes.
+ *
+ * Uses the real mapping table: Unicode and Shift-JIS do not line up
+ * arithmetically, so anything derived by formula produces symbols that decode
+ * to the wrong characters.
  */
 export function unicodeToShiftJIS(text: string): number[] {
   const values: number[] = []
-  for (let i = 0; i < text.length; i++) {
-    const code = text.charCodeAt(i)
-    // Simple mapping for common ranges
-    // Full SJIS mapping would require a large lookup table
-    // For now, encode the code point directly if in Kanji range
-    if (code >= 0x3000 && code <= 0x9fff) {
-      // Approximate mapping: many CJK characters fall in SJIS 0x8140-0x9FFC range
-      // This is a simplification — production use would need a full mapping table
-      const sjis = 0x8140 + (code - 0x3000)
-      if (sjis <= 0x9ffc) {
-        values.push(sjis)
-      } else {
-        values.push(0xe040 + (code - 0x3000 - (0x9ffc - 0x8140)))
-      }
-    } else {
-      throw new InvalidInputError(`Character U+${code.toString(16)} cannot be encoded as Kanji`)
+  for (const char of text) {
+    const sjis = toShiftJIS(char)
+    if (sjis === undefined) {
+      throw new InvalidInputError(
+        `Character "${char}" (U+${char.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")}) cannot be encoded in QR kanji mode`,
+      )
     }
+    values.push(sjis)
   }
   return values
 }

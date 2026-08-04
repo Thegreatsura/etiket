@@ -16,13 +16,16 @@
 
 import type { QRSegment } from "./types"
 import { getCharCountBits, ALPHANUMERIC_CHARS } from "./tables"
+import { isKanjiChar } from "./kanji"
 
-type Mode = "numeric" | "alphanumeric" | "byte"
+type Mode = "numeric" | "alphanumeric" | "byte" | "kanji"
 
-const MODES: readonly Mode[] = ["numeric", "alphanumeric", "byte"]
+const MODES: readonly Mode[] = ["numeric", "alphanumeric", "byte", "kanji"]
 const NUMERIC = 0
 const ALPHANUMERIC = 1
 const BYTE = 2
+const KANJI = 3
+const MODE_COUNT = MODES.length
 
 /** UTF-8 byte length of a single code point */
 function utf8Length(char: string): number {
@@ -48,6 +51,9 @@ function charCost(char: string, mode: number): number {
       return isDigit(char) ? 20 : Infinity
     case ALPHANUMERIC:
       return isAlphanumeric(char) ? 33 : Infinity
+    case KANJI:
+      // 13 bits per character, and only for what Shift-JIS can hold
+      return isKanjiChar(char) ? 78 : Infinity
     default:
       return utf8Length(char) * 48
   }
@@ -77,10 +83,10 @@ export function optimizeSegments(text: string, version: number): QRSegment[] {
   let prevCosts = headCost.slice()
 
   for (const char of chars) {
-    const costs = [Infinity, Infinity, Infinity]
-    const from = [-1, -1, -1]
+    const costs = Array.from<number>({ length: MODE_COUNT }).fill(Infinity)
+    const from = Array.from<number>({ length: MODE_COUNT }).fill(-1)
 
-    for (let mode = 0; mode < 3; mode++) {
+    for (let mode = 0; mode < MODE_COUNT; mode++) {
       const perChar = charCost(char, mode)
       if (perChar === Infinity) continue
 
@@ -92,7 +98,7 @@ export function optimizeSegments(text: string, version: number): QRSegment[] {
 
       // Switching into this mode: the previous segment ends here, so its cost
       // is rounded up to a whole bit before the new header is added
-      for (let previous = 0; previous < 3; previous++) {
+      for (let previous = 0; previous < MODE_COUNT; previous++) {
         if (previous === mode || prevCosts[previous]! === Infinity) continue
         const switched = roundToBit(prevCosts[previous]!) + headCost[mode]! + perChar
         if (switched < costs[mode]!) {
@@ -108,7 +114,7 @@ export function optimizeSegments(text: string, version: number): QRSegment[] {
 
   // Cheapest terminal mode
   let endMode = BYTE
-  for (let mode = 0; mode < 3; mode++) {
+  for (let mode = 0; mode < MODE_COUNT; mode++) {
     if (roundToBit(prevCosts[mode]!) < roundToBit(prevCosts[endMode]!)) endMode = mode
   }
 
@@ -142,5 +148,6 @@ function makeSegment(text: string, mode: number): QRSegment {
     const data = new TextEncoder().encode(text)
     return { mode: "byte", data, charCount: data.length }
   }
-  return { mode: MODES[mode]!, data: text, charCount: text.length }
+  // Kanji counts characters, and a kanji character is always one code unit here
+  return { mode: MODES[mode]!, data: text, charCount: [...text].length }
 }
