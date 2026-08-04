@@ -23,22 +23,18 @@ on:
 
 jobs:
   test:
-    name: Test (node ${{ matrix.node }}, ${{ matrix.os }})
+    name: Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        node: [20, 22, 24]
-        include:
-          - os: windows-latest
-            node: 22
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v5
       - run: corepack enable
       - uses: actions/setup-node@v6
         with:
-          node-version: ${{ matrix.node }}
+          node-version: 24
           cache: pnpm
       - name: 📦 Install dependencies
         run: pnpm install --frozen-lockfile
@@ -59,7 +55,7 @@ jobs:
       - run: corepack enable
       - uses: actions/setup-node@v6
         with:
-          node-version: lts/*
+          node-version: 24
           cache: pnpm
       - name: 📦 Install dependencies
         run: pnpm install --frozen-lockfile
@@ -75,7 +71,7 @@ jobs:
       - run: corepack enable
       - uses: actions/setup-node@v6
         with:
-          node-version: lts/*
+          node-version: 24
           cache: pnpm
       - name: 📦 Install dependencies
         run: pnpm install --frozen-lockfile
@@ -102,7 +98,19 @@ jobs:
         run: |
           cd "$RUNNER_TEMP/consumer"
           node --input-type=module -e "
-            const entries = ['etiket', 'etiket/barcode', 'etiket/postal', 'etiket/qr', 'etiket/datamatrix', 'etiket/pdf417', 'etiket/aztec', 'etiket/png']
+            const entries = [
+              'etiket',
+              'etiket/barcode',
+              'etiket/postal',
+              'etiket/qr',
+              'etiket/datamatrix',
+              'etiket/pdf417',
+              'etiket/aztec',
+              'etiket/2d',
+              'etiket/png',
+              'etiket/errors',
+              'etiket/validators',
+            ]
             for (const entry of entries) {
               const mod = await import(entry)
               if (Object.keys(mod).length === 0) throw new Error(entry + ' exported nothing')

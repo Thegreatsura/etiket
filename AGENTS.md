@@ -224,8 +224,8 @@ v1. The full gate (`pnpm test`) is green:
   `vitest.config.ts`
 - Every symbology reachable from the public API, the CLI, PNG output and
   validation
-- CI runs a Node 20/22/24 matrix plus Windows, and packs the tarball to run the
-  CLI and every entry point from a clean install
+- CI runs Node 24 on Linux and Windows, and packs the tarball to run the CLI and
+  every entry point from a clean install
 
 **Verification status.** Every symbology is checked against an implementation
 that is not this one — decoded back with zxing-wasm or jsQR, or compared
