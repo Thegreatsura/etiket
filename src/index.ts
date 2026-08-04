@@ -114,6 +114,12 @@ export type { HanXinOptions } from "./encoders/hanxin"
 export { encodeJABCode, JAB_COLORS_4, JAB_COLORS_8 } from "./encoders/jabcode"
 export type { JABCodeOptions, JABCodeResult } from "./encoders/jabcode"
 export { encodeDataMatrix, encodeGS1DataMatrix } from "./encoders/datamatrix/index"
+export type {
+  DataMatrixShape,
+  DataMatrixSizeOptions,
+  SymbolSize as DataMatrixSymbolSize,
+} from "./encoders/datamatrix/tables"
+export { SYMBOL_SIZES as DATAMATRIX_SYMBOL_SIZES } from "./encoders/datamatrix/tables"
 export { encodePDF417 } from "./encoders/pdf417/index"
 export type { PDF417Options } from "./encoders/pdf417/index"
 export { encodeMicroPDF417 } from "./encoders/micropdf417"

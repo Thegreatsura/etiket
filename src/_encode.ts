@@ -50,9 +50,9 @@ export function encode(text: string, options: EncodeOptions = {}): EncodeResult 
     case "rmqr":
       return { type: "2d", matrix: encodeRMQR(text, options.rmqr) }
     case "datamatrix":
-      return { type: "2d", matrix: encodeDataMatrix(text) }
+      return { type: "2d", matrix: encodeDataMatrix(text, options.datamatrix) }
     case "gs1-datamatrix":
-      return { type: "2d", matrix: encodeGS1DataMatrix(text) }
+      return { type: "2d", matrix: encodeGS1DataMatrix(text, options.datamatrix) }
     case "pdf417":
       return { type: "2d", matrix: encodePDF417(text, options.pdf417).matrix }
     case "micropdf417":

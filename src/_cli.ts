@@ -56,6 +56,7 @@ import type { BarcodeType } from "./index"
 import type { PostalType } from "./_postal"
 import type { DotType } from "./renderers/svg/types"
 import type { ErrorCorrectionLevel } from "./encoders/qr/types"
+import type { DataMatrixShape } from "./encoders/datamatrix/tables"
 
 /** Symbologies reachable through `etiket barcode`. */
 const BARCODE_TYPES: BarcodeType[] = [
@@ -370,16 +371,44 @@ const datamatrixCommand = defineCommand({
     text: { type: "positional", description: "Text to encode", required: true },
     ...matrixArgs,
     gs1: { type: "boolean", description: "Encode as GS1 DataMatrix" },
+    shape: {
+      type: "string",
+      description: "Symbol shape: square (default), rectangle or auto",
+    },
+    dmre: {
+      type: "boolean",
+      description: "Allow ISO 21471 DMRE rectangular sizes",
+    },
+    "symbol-size": {
+      type: "string",
+      description: 'Force an exact symbol size, e.g. "26x64"',
+    },
   },
   run({ args }) {
-    const values = args as unknown as MatrixArgValues & { text: string }
+    const values = args as unknown as MatrixArgValues & {
+      text: string
+      shape?: string
+      dmre?: boolean
+      "symbol-size"?: string
+    }
+    const shape = values.shape as DataMatrixShape | undefined
+    if (shape && shape !== "square" && shape !== "rectangle" && shape !== "auto") {
+      consola.error(`Unknown Data Matrix shape "${values.shape}" — use square, rectangle or auto`)
+      process.exitCode = 1
+      return
+    }
+    const sizeOptions = {
+      shape,
+      dmre: values.dmre,
+      symbolSize: values["symbol-size"],
+    }
     if (wantsPNG(values)) {
       const png = args.gs1 ? gs1datamatrixPNG : datamatrixPNG
-      output(png(args.text, pngMatrixOptions(values)), values.output)
+      output(png(args.text, { ...pngMatrixOptions(values), ...sizeOptions }), values.output)
       return
     }
     const svg = args.gs1 ? gs1datamatrix : datamatrix
-    output(svg(args.text, svgMatrixOptions(values)), values.output)
+    output(svg(args.text, { ...svgMatrixOptions(values), ...sizeOptions }), values.output)
   },
 })
 

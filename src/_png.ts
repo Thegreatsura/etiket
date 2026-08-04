@@ -5,6 +5,7 @@
 import { encodeBars } from "./_barcode"
 import { encodeQR } from "./encoders/qr/index"
 import { encodeDataMatrix, encodeGS1DataMatrix } from "./encoders/datamatrix/index"
+import type { DataMatrixSizeOptions } from "./encoders/datamatrix/tables"
 import { encodePDF417 } from "./encoders/pdf417/index"
 import { encodeAztec } from "./encoders/aztec/index"
 import { encodeMicroQR } from "./encoders/qr/micro"
@@ -104,30 +105,44 @@ export function qrcodePNGDataURI(text: string, options?: QRCodeOptions & MatrixP
 /**
  * Generate a Data Matrix as PNG
  */
-export function datamatrixPNG(text: string, options?: MatrixPNGOptions): Uint8Array {
-  const matrix = encodeDataMatrix(text)
-  return renderMatrixPNG(matrix, options)
+export function datamatrixPNG(
+  text: string,
+  options?: DataMatrixSizeOptions & MatrixPNGOptions,
+): Uint8Array {
+  const { shape, dmre, symbolSize, ...pngOpts } = options ?? {}
+  const matrix = encodeDataMatrix(text, { shape, dmre, symbolSize })
+  return renderMatrixPNG(matrix, pngOpts)
 }
 
 /**
  * Generate a Data Matrix as PNG data URI
  */
-export function datamatrixPNGDataURI(text: string, options?: MatrixPNGOptions): string {
+export function datamatrixPNGDataURI(
+  text: string,
+  options?: DataMatrixSizeOptions & MatrixPNGOptions,
+): string {
   return toPNGDataURI(datamatrixPNG(text, options))
 }
 
 /**
  * Generate a GS1 Data Matrix as PNG
  */
-export function gs1datamatrixPNG(text: string, options?: MatrixPNGOptions): Uint8Array {
-  const matrix = encodeGS1DataMatrix(text)
-  return renderMatrixPNG(matrix, options)
+export function gs1datamatrixPNG(
+  text: string,
+  options?: DataMatrixSizeOptions & MatrixPNGOptions,
+): Uint8Array {
+  const { shape, dmre, symbolSize, ...pngOpts } = options ?? {}
+  const matrix = encodeGS1DataMatrix(text, { shape, dmre, symbolSize })
+  return renderMatrixPNG(matrix, pngOpts)
 }
 
 /**
  * Generate a GS1 Data Matrix as PNG data URI
  */
-export function gs1datamatrixPNGDataURI(text: string, options?: MatrixPNGOptions): string {
+export function gs1datamatrixPNGDataURI(
+  text: string,
+  options?: DataMatrixSizeOptions & MatrixPNGOptions,
+): string {
   return toPNGDataURI(gs1datamatrixPNG(text, options))
 }
 

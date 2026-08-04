@@ -24,21 +24,30 @@ import type { RMQROptions } from "./encoders/rmqr"
 import type { MaxiCodeOptions } from "./encoders/maxicode"
 import type { HanXinOptions } from "./encoders/hanxin"
 import type { MicroPDF417Options } from "./encoders/micropdf417"
+import type { DataMatrixSizeOptions } from "./encoders/datamatrix/tables"
 
 /**
  * Generate a Data Matrix as SVG string
  */
-export function datamatrix(text: string, options?: MatrixSVGOptions): string {
-  const matrix = encodeDataMatrix(text)
-  return renderMatrixSVG(matrix, options)
+export function datamatrix(
+  text: string,
+  options?: DataMatrixSizeOptions & MatrixSVGOptions,
+): string {
+  const { shape, dmre, symbolSize, ...svgOpts } = options ?? {}
+  const matrix = encodeDataMatrix(text, { shape, dmre, symbolSize })
+  return renderMatrixSVG(matrix, svgOpts)
 }
 
 /**
  * Generate a GS1 DataMatrix as SVG string
  */
-export function gs1datamatrix(text: string, options?: MatrixSVGOptions): string {
-  const matrix = encodeGS1DataMatrix(text)
-  return renderMatrixSVG(matrix, options)
+export function gs1datamatrix(
+  text: string,
+  options?: DataMatrixSizeOptions & MatrixSVGOptions,
+): string {
+  const { shape, dmre, symbolSize, ...svgOpts } = options ?? {}
+  const matrix = encodeGS1DataMatrix(text, { shape, dmre, symbolSize })
+  return renderMatrixSVG(matrix, svgOpts)
 }
 
 /**

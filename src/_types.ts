@@ -12,6 +12,7 @@ import type { MicroPDF417Options } from "./encoders/micropdf417"
 import type { AztecOptions } from "./encoders/aztec/index"
 import type { MaxiCodeOptions } from "./encoders/maxicode"
 import type { HanXinOptions } from "./encoders/hanxin"
+import type { DataMatrixSizeOptions } from "./encoders/datamatrix/tables"
 
 /** Width-modulated linear symbologies rendered by `barcode()`. */
 export type BarcodeType =
@@ -95,6 +96,7 @@ export interface EncodeOptions extends Omit<BarcodeEncodingOptions, "type"> {
   maxicode?: MaxiCodeOptions
   hanxin?: HanXinOptions
   codablockf?: { columns?: number }
+  datamatrix?: DataMatrixSizeOptions
 }
 
 export interface Encode1DResult {
