@@ -13,7 +13,7 @@ try {
 } catch (error) {
   if (error instanceof EtiketError) {
     error.name // "InvalidInputError"
-    error.message // "EAN-13 requires 12 or 13 numeric digits"
+    error.message // "EAN-13 requires 12 or 13 digits"
   } else {
     throw error
   }
@@ -173,7 +173,7 @@ Data Matrix, PDF417, MicroPDF417, Aztec, MaxiCode, Han Xin, JAB Code, Code 16K,
 Codablock F and the GS1 composite components.
 
 ```ts
-import { encodeMicroQR, encodeDataMatrix, encodeAztec, CapacityError } from "etiket"
+import { encodeMicroQR, encodeDataMatrix, encodeAztec, encodeHanXin, CapacityError } from "etiket"
 
 function overflows(fn: () => unknown): boolean {
   try {
@@ -184,9 +184,10 @@ function overflows(fn: () => unknown): boolean {
   }
 }
 
-overflows(() => encodeMicroQR("far too much data for an M1 symbol", { version: 1 })) // true
+overflows(() => encodeMicroQR("A".repeat(60))) // true — beyond M4
 overflows(() => encodeDataMatrix("A".repeat(40), { symbolSize: "10x10" })) // true
 overflows(() => encodeAztec("A".repeat(200), { layers: 1, compact: true })) // true
+overflows(() => encodeHanXin("A".repeat(50), { version: 1 })) // true
 ```
 
 A `CapacityError` from an _unpinned_ call means the data exceeds the largest

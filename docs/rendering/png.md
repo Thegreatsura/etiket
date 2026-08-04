@@ -29,6 +29,7 @@ data URI variant just base64-encodes the bytes.
 | Stacked     | `codablockfPNG`, `code16kPNG`                                                      |
 | Other       | `maxicodePNG`, `dotcodePNG`, `hanxinPNG`, `jabcodePNG`                             |
 | GS1 DataBar | `gs1databarStackedPNG`, `gs1databarStackedOmniPNG`, `gs1databarExpandedStackedPNG` |
+| Composite   | `gs1compositePNG`                                                                  |
 
 Each takes the encoder options of its symbology plus one of the three PNG option
 shapes below.
@@ -75,6 +76,19 @@ jabcodePNG("Hello", { colors: 8, moduleSize: 8 })
 gs1databarStackedPNG("0361414199999", { moduleSize: 4 })
 gs1databarStackedOmniPNG("0361414199999", { moduleSize: 4 })
 gs1databarExpandedStackedPNG("(01)90012345678908(3103)001750", { segments: 4, moduleSize: 4 })
+```
+
+`gs1compositePNG` is the exception to the "text first" shape: it takes the
+linear symbology, then a `"<linear data>|<composite data>"` string, and sets
+`rowHeights` itself so the linear component keeps its own height.
+
+```ts
+import { gs1compositePNG, gs1compositePNGDataURI } from "etiket/png"
+
+gs1compositePNG("databar-omni", "(01)09521234543213|(11)990102", { moduleSize: 4 })
+
+const uri = gs1compositePNGDataURI("databar-omni", "(01)09521234543213|(11)990102")
+uri.startsWith("data:image/png;base64,") // true
 ```
 
 ## Options
@@ -218,7 +232,7 @@ import { writeFileSync } from "node:fs"
 import { qrcodePNG } from "etiket/png"
 
 const png = qrcodePNG("https://example.com", { moduleSize: 10, margin: 4 })
-writeFileSync("/tmp/etiket-example-qr.png", png)
+writeFileSync("qr.png", png)
 ```
 
 In a browser, wrap the bytes in a `Blob`:
@@ -227,17 +241,19 @@ In a browser, wrap the bytes in a `Blob`:
 import { qrcodePNG } from "etiket/png"
 
 const png = qrcodePNG("https://example.com")
-const blob = new Blob([png], { type: "image/png" })
+const blob = new Blob([new Uint8Array(png)], { type: "image/png" })
 blob.size === png.length // true
 ```
 
-And in an HTTP response — the bytes are already a `Uint8Array`, so they need no
-conversion:
+And in an HTTP response. The extra `new Uint8Array(...)` in both snippets is
+only there to satisfy TypeScript: `Uint8Array` is generic over its buffer type,
+and `BlobPart` / `BodyInit` want the plain `ArrayBuffer` flavour. At runtime the
+bytes go straight through.
 
 ```ts
 import { qrcodePNG } from "etiket/png"
 
-const response = new Response(qrcodePNG("https://example.com"), {
+const response = new Response(new Uint8Array(qrcodePNG("https://example.com")), {
   headers: { "content-type": "image/png" },
 })
 response.headers.get("content-type") // "image/png"

@@ -99,7 +99,7 @@ const everything: PostalOptions = { type: "rm4scc", ...geometry }
 
 const bars: PostalBar[] = encodePostal("SN34RD1A", { type: "rm4scc" })
 const first = bars[0] as FourState
-first // "F"
+first // "A"
 
 renderPostalSVG(bars, geometry)
 void everything
@@ -199,21 +199,27 @@ barcode("12345", { unit: print, moduleSize: 0.33, height: 25 })
 
 ### 2D encoders
 
-| Type                    | Fields                                                         |
-| :---------------------- | :------------------------------------------------------------- |
-| `DataMatrixShape`       | `"square" \| "rectangle" \| "auto"`                            |
-| `DataMatrixSizeOptions` | `shape`, `dmre`, `symbolSize`                                  |
-| `DataMatrixSymbolSize`  | One row of the size table: rows, cols, data regions, codewords |
-| `PDF417Options`         | `ecLevel`, `columns`, `compact`, `eci`, `macro`, `readerInit`  |
-| `MicroPDF417Options`    | `columns` (1–4)                                                |
-| `AztecOptions`          | `ecPercent`, `layers`, `compact`, `eci`                        |
-| `MaxiCodeOptions`       | `mode` (2–6), `postalCode`, `countryCode`, `serviceClass`      |
-| `DotCodeOptions`        | `rows`, `columns`, `mask`                                      |
-| `HanXinOptions`         | `ecLevel` (1–4), `version` (1–84), `mask` (1–4)                |
-| `JABCodeOptions`        | `colors` (4 or 8), `ecPercent`                                 |
-| `JABCodeResult`         | `matrix` of palette indices, `rows`, `cols`, `palette`         |
-| `CompositeType`         | `"CC-A" \| "CC-B" \| "CC-C"`                                   |
-| `GS1CompositeResult`    | `composite`, `type`, `rows`, `cols`, `columns`                 |
+| Type                       | Fields                                                                |
+| :------------------------- | :-------------------------------------------------------------------- |
+| `DataMatrixShape`          | `"square" \| "rectangle" \| "auto"`                                   |
+| `DataMatrixSizeOptions`    | `shape`, `dmre`, `symbolSize`                                         |
+| `DataMatrixSymbolSize`     | One row of the size table: rows, cols, data regions, codewords        |
+| `PDF417Options`            | `ecLevel`, `columns`, `compact`, `eci`, `macro`, `readerInit`         |
+| `MicroPDF417Options`       | `columns` (1–4)                                                       |
+| `AztecOptions`             | `ecPercent`, `layers`, `compact`, `eci`                               |
+| `MaxiCodeOptions`          | `mode` (2–6), `postalCode`, `countryCode`, `serviceClass`             |
+| `DotCodeOptions`           | `rows`, `columns`, `mask`                                             |
+| `HanXinOptions`            | `ecLevel` (1–4), `version` (1–84), `mask` (1–4)                       |
+| `JABCodeOptions`           | `colors` (4 or 8), `ecPercent`                                        |
+| `JABCodeResult`            | `matrix` of palette indices, `rows`, `cols`, `palette`                |
+| `CompositeType`            | `"CC-A" \| "CC-B" \| "CC-C"`                                          |
+| `CompositeLinearType`      | The linear symbology a composite component sits above                 |
+| `GS1CompositeOptions`      | `type`, `columns`, `linear`, `linearWidth`                            |
+| `GS1CompositeResult`       | `composite`, `type`, `rows`, `cols`, `columns`                        |
+| `GS1CompositeSymbolResult` | The complete symbol: `matrix`, `rowHeights`, `linear`, `separator`, … |
+| `PDF417MacroOptions`       | One symbol's Macro PDF417 control block                               |
+| `PDF417SharedMacroOptions` | The macro fields that stay the same across a sequence                 |
+| `PDF417SequenceOptions`    | `PDF417Options` without `macro`, plus `symbols` and `fileId`          |
 
 ```ts
 import type {
@@ -224,20 +230,26 @@ import type {
   AztecOptions,
   MaxiCodeOptions,
   CompositeType,
+  CompositeLinearType,
+  GS1CompositeOptions,
   GS1CompositeResult,
+  GS1CompositeSymbolResult,
   JABCodeResult,
 } from "etiket"
 import {
   encodeDataMatrix,
   encodeGS1Composite,
+  encodeGS1CompositeSymbol,
   encodeJABCode,
   DATAMATRIX_SYMBOL_SIZES,
 } from "etiket"
 
 const shape: DataMatrixShape = "rectangle"
 const size: DataMatrixSizeOptions = { shape, dmre: true }
-const biggest: DataMatrixSymbolSize | undefined = DATAMATRIX_SYMBOL_SIZES.at(-1)
-biggest?.totalDataCodewords // 1558
+const largest: DataMatrixSymbolSize | undefined = DATAMATRIX_SYMBOL_SIZES.find(
+  (entry) => entry.rows === 144,
+)
+largest?.totalDataCodewords // 1558
 
 encodeDataMatrix("Hello", size)
 
@@ -247,11 +259,41 @@ const maxi: MaxiCodeOptions = { mode: 3, postalCode: "SW1A1", countryCode: 826, 
 void [pdf, az, maxi]
 
 const cc: CompositeType = "CC-A"
-const composite: GS1CompositeResult = encodeGS1Composite("(17)260101(10)BATCH01", { type: cc })
+const linearType: CompositeLinearType = "databar-omni"
+const compositeOptions: GS1CompositeOptions = { type: cc, columns: 4 }
+const composite: GS1CompositeResult = encodeGS1Composite("(17)260101(10)BATCH01", compositeOptions)
 composite.rows
+
+const whole: GS1CompositeSymbolResult = encodeGS1CompositeSymbol(
+  linearType,
+  "(01)09521234543213|(11)990102",
+)
+whole.rowHeights.length === whole.matrix.length // true
 
 const jab: JABCodeResult = encodeJABCode("Hello")
 jab.palette.length // 4
+```
+
+### Macro PDF417
+
+`encodePDF417Sequence()` splits a message across several symbols, each carrying
+a Macro control block. `PDF417SequenceOptions` drives the split;
+`PDF417SharedMacroOptions` carries the descriptive fields that are the same on
+every segment, and `PDF417MacroOptions` is the per-symbol block underneath —
+reach for it only if you are driving the split yourself through
+`PDF417Options.macro`.
+
+```ts
+import type { PDF417SequenceOptions, PDF417SharedMacroOptions, PDF417MacroOptions } from "etiket"
+import { encodePDF417Sequence, encodePDF417 } from "etiket"
+
+const shared: PDF417SharedMacroOptions = { fileName: "manifest.txt", sender: "Warehouse 4" }
+const sequence: PDF417SequenceOptions = { symbols: 3, macro: shared }
+
+encodePDF417Sequence("A".repeat(3000), sequence).length // 3
+
+const block: PDF417MacroOptions = { segmentIndex: 0, fileId: "017053", lastSegment: false }
+encodePDF417("segment one", { macro: block }).rows > 0 // true
 ```
 
 ### 1D encoders
@@ -360,12 +402,14 @@ module tall while the data rows are eight.
 
 ## PNG Types
 
-| Type                | Used by                                                 |
-| :------------------ | :------------------------------------------------------ |
-| `BarcodePNGOptions` | `barcodePNG`, `renderBarcodePNG`, `renderBarcodeRaster` |
-| `PostalPNGOptions`  | `postalPNG`, `renderPostalPNG`, `renderPostalRaster`    |
-| `MatrixPNGOptions`  | every 2D `*PNG`, `renderMatrixPNG`, `renderMaxiCodePNG` |
-| `RasterData`        | what the four `*Raster` functions return                |
+| Type                    | Used by                                                 |
+| :---------------------- | :------------------------------------------------------ |
+| `BarcodePNGOptions`     | `barcodePNG`, `renderBarcodePNG`, `renderBarcodeRaster` |
+| `PostalPNGOptions`      | `postalPNG`, `renderPostalPNG`, `renderPostalRaster`    |
+| `MatrixPNGOptions`      | every 2D `*PNG`, `renderMatrixPNG`, `renderMaxiCodePNG` |
+| `ColorMatrixPNGOptions` | Palette-indexed PNG options — `jabcodePNG()`            |
+| `TextRenderOptions`     | Terminal output options — `renderText()`                |
+| `RasterData`            | what the four `*Raster` functions return                |
 
 ### RasterData
 
@@ -417,6 +461,10 @@ barcodeSheet(["A", "B", "C"], sheetStyle).startsWith("<svg") // true
 A handful of internal shapes are reachable through inference but have no
 exported name. Use `Parameters<>` / `ReturnType<>` if you need to hold one.
 
+`TextRenderOptions` and `ColorMatrixPNGOptions` used to be on this list; both
+are exported now, so the argument to `renderText()` and to `jabcodePNG()` can be
+named directly.
+
 | Shape                                             | Where it appears                               |
 | :------------------------------------------------ | :--------------------------------------------- |
 | `{ eci?: number }`                                | The Data Matrix encoder half of `datamatrix()` |
@@ -427,7 +475,6 @@ exported name. Use `Parameters<>` / `ReturnType<>` if you need to hold one.
 | `{ custInfoEncoding?: "character" \| "numeric" }` | `encodeAustraliaPost()`                        |
 | `{ matrix, rows, cols }`                          | `encodePDF417()`, `encodeMicroPDF417()`        |
 | `{ matrix, rows, cols, separatorRows }`           | `encodeCodablockF()`, `encodeCode16K()`        |
-| `TextRenderOptions`                               | `renderText()`                                 |
 
 ```ts
 import { encodePDF417, encodeCode16K, renderText, encodeQR } from "etiket"

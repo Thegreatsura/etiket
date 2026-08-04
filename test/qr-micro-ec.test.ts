@@ -47,3 +47,23 @@ describe("QR validation of kanji", () => {
     expect(result.error).toMatch(/too long/i)
   })
 })
+
+describe("Micro QR capacity with a pinned version", () => {
+  it("refuses data that does not fit the requested version", () => {
+    // M1 holds 5 numeric characters
+    expect(() => encodeMicroQR("123456", { version: 1 })).toThrow(CapacityError)
+    expect(() => encodeMicroQR("123456", { version: 1 })).toThrow(/capacity is 5/)
+    // M2 at EC M holds 8
+    expect(() => encodeMicroQR("123456789", { version: 2, ecLevel: "M" })).toThrow(CapacityError)
+  })
+
+  it("refuses a mode the requested version cannot carry", () => {
+    // M1 is numeric only; M2 has no byte mode
+    expect(() => encodeMicroQR("ABCDE", { version: 1 })).toThrow(/numeric only/)
+    expect(() => encodeMicroQR("hello", { version: 2 })).toThrow(InvalidInputError)
+  })
+
+  it("still encodes what does fit", () => {
+    expect(encodeMicroQR("12345", { version: 1 })).toHaveLength(11)
+  })
+})

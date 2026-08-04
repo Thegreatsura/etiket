@@ -146,9 +146,17 @@ function isDigit(ch: string): boolean {
   return c >= 48 && c <= 57
 }
 
+/** A digit run this long is always cheaper in numeric compaction than in text */
+const NUMERIC_RUN_THRESHOLD = 13
+/**
+ * An all-digit message pays no latch back to text, so numeric compaction wins
+ * from a much shorter run — the same cut-off BWIPP uses.
+ */
+const ALL_NUMERIC_THRESHOLD = 8
+
 /**
  * Analyze input and split into optimal segments by compaction mode.
- * - Runs of 13+ digits use numeric compaction
+ * - Runs of 13+ digits, and all-digit messages of 8+ digits, use numeric compaction
  * - Runs of text-compactable characters use text compaction
  * - Everything else uses byte compaction
  */
@@ -160,7 +168,10 @@ function analyzeSegments(bytes: number[]): Segment[] {
   while (pos < text.length) {
     // Check for long numeric run (13+ digits for efficiency)
     const numericRun = countDigits(text, pos)
-    if (numericRun >= 13) {
+    if (
+      numericRun >= NUMERIC_RUN_THRESHOLD ||
+      (numericRun === text.length && numericRun >= ALL_NUMERIC_THRESHOLD)
+    ) {
       segments.push({ mode: "numeric", start: pos, end: pos + numericRun })
       pos += numericRun
       continue
@@ -201,9 +212,9 @@ function countTextCompactable(text: string, pos: number): number {
 
 function countNonTextCompactable(text: string, pos: number): number {
   let count = 0
+  // Digits all live in the Mixed sub-mode, so `isTextCompactable` already stops
+  // this run at the start of a numeric one
   while (pos + count < text.length && !isTextCompactable(text[pos + count]!)) {
-    // Also break if we hit a long numeric run
-    if (isDigit(text[pos + count]!)) break
     count++
   }
   return Math.max(count, 1)
@@ -251,132 +262,177 @@ export function textToCodewords(text: string): number[] {
   return codewords
 }
 
+/** The four text compaction sub-modes, in the order ISO/IEC 15438 Table 4 lists them */
+const SUB_MODES = [
+  TextSubMode.Alpha,
+  TextSubMode.Lower,
+  TextSubMode.Mixed,
+  TextSubMode.Punctuation,
+] as const
+
 /**
- * Convert text to a sequence of sub-codeword values using text compaction sub-modes.
- * Handles mode switching between Alpha, Lower, Mixed, and Punctuation sub-modes.
+ * Shortest latch sequence between two sub-modes, indexed `[from][to]`.
+ *
+ * Only Mixed reaches every other sub-mode in one step. Alpha and Lower have no
+ * latch to Punctuation and Lower has none back to Alpha, so those route through
+ * Mixed; Punctuation only latches to Alpha, so it routes through Alpha.
  */
-function textToSubCodewords(text: string): number[] {
-  const values: number[] = []
-  let currentMode: TextSubMode = TextSubMode.Alpha
+const LATCH_SEQUENCE: readonly (readonly (readonly number[])[])[] = [
+  // from Alpha
+  [
+    [],
+    [TEXT_SWITCH.ALPHA_TO_LOWER],
+    [TEXT_SWITCH.ALPHA_TO_MIXED],
+    [TEXT_SWITCH.ALPHA_TO_MIXED, TEXT_SWITCH.MIXED_TO_PUNCT_LATCH],
+  ],
+  // from Lower
+  [
+    [TEXT_SWITCH.LOWER_TO_MIXED, TEXT_SWITCH.MIXED_TO_ALPHA],
+    [],
+    [TEXT_SWITCH.LOWER_TO_MIXED],
+    [TEXT_SWITCH.LOWER_TO_MIXED, TEXT_SWITCH.MIXED_TO_PUNCT_LATCH],
+  ],
+  // from Mixed
+  [
+    [TEXT_SWITCH.MIXED_TO_ALPHA],
+    [TEXT_SWITCH.MIXED_TO_LOWER],
+    [],
+    [TEXT_SWITCH.MIXED_TO_PUNCT_LATCH],
+  ],
+  // from Punctuation
+  [
+    [TEXT_SWITCH.PUNCT_TO_ALPHA],
+    [TEXT_SWITCH.PUNCT_TO_ALPHA, TEXT_SWITCH.ALPHA_TO_LOWER],
+    [TEXT_SWITCH.PUNCT_TO_ALPHA, TEXT_SWITCH.ALPHA_TO_MIXED],
+    [],
+  ],
+]
 
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i]!
-    const encoded = encodeTextChar(ch, currentMode, values)
-    currentMode = encoded
-  }
+/**
+ * Single-character shift into another sub-mode, indexed `[from][to]`.
+ * `undefined` where the standard defines no shift for the pair.
+ */
+const SHIFT_CODE: readonly (readonly (number | undefined)[])[] = [
+  // from Alpha
+  [undefined, undefined, undefined, TEXT_SWITCH.ALPHA_TO_PUNCT_SHIFT],
+  // from Lower
+  [TEXT_SWITCH.LOWER_TO_ALPHA_SHIFT, undefined, undefined, TEXT_SWITCH.LOWER_TO_PUNCT_SHIFT],
+  // from Mixed
+  [undefined, undefined, undefined, TEXT_SWITCH.MIXED_TO_PUNCT_SHIFT],
+  // from Punctuation — a shift out of Punctuation does not exist
+  [undefined, undefined, undefined, undefined],
+]
 
-  return values
+/** One move in the sub-codeword search: the values it emits and where it came from */
+interface TextStep {
+  /** Sub-codewords this step appends */
+  emit: readonly number[]
+  /** Character index the step starts from */
+  index: number
+  /** Sub-mode the step starts from */
+  mode: TextSubMode
 }
 
 /**
- * Encode a single character in text compaction, adding necessary mode switches.
- * Returns the new current sub-mode after encoding.
+ * Relax the cost of every sub-mode at one character position by latching into
+ * it from another sub-mode. Repeated until nothing improves, so a two-step
+ * route (Punctuation → Alpha → Lower) is considered as well as a direct one.
  */
-function encodeTextChar(ch: string, currentMode: TextSubMode, values: number[]): TextSubMode {
-  // Try encoding in current mode first
-  const currentVal = getCharValue(ch, currentMode)
-  if (currentVal !== -1) {
-    values.push(currentVal)
-    return currentMode
+function relaxLatches(cost: number[], back: (TextStep | undefined)[], index: number): void {
+  let improved = true
+  while (improved) {
+    improved = false
+    for (const from of SUB_MODES) {
+      const base = cost[from]!
+      if (!Number.isFinite(base)) continue
+      for (const to of SUB_MODES) {
+        if (from === to) continue
+        const sequence = LATCH_SEQUENCE[from]![to]!
+        const candidate = base + sequence.length
+        if (candidate < cost[to]!) {
+          cost[to] = candidate
+          back[to] = { emit: sequence, index, mode: from }
+          improved = true
+        }
+      }
+    }
   }
+}
 
-  // Need to switch mode. Find which mode can encode this character.
-  if (currentMode === TextSubMode.Alpha) {
-    // Try Lower
-    const lowerVal = getCharValue(ch, TextSubMode.Lower)
-    if (lowerVal !== -1) {
-      values.push(TEXT_SWITCH.ALPHA_TO_LOWER) // latch to lower
-      values.push(lowerVal)
-      return TextSubMode.Lower
-    }
-    // Try Mixed
-    const mixedVal = getCharValue(ch, TextSubMode.Mixed)
-    if (mixedVal !== -1) {
-      values.push(TEXT_SWITCH.ALPHA_TO_MIXED) // latch to mixed
-      values.push(mixedVal)
-      return TextSubMode.Mixed
-    }
-    // Try Punctuation (shift)
-    const punctVal = getCharValue(ch, TextSubMode.Punctuation)
-    if (punctVal !== -1) {
-      values.push(TEXT_SWITCH.ALPHA_TO_PUNCT_SHIFT) // shift to punct
-      values.push(punctVal)
-      return TextSubMode.Alpha // shift returns to current mode
-    }
-  } else if (currentMode === TextSubMode.Lower) {
-    // Try Alpha (shift for single char)
-    const alphaVal = getCharValue(ch, TextSubMode.Alpha)
-    if (alphaVal !== -1) {
-      values.push(TEXT_SWITCH.LOWER_TO_ALPHA_SHIFT) // shift to alpha
-      values.push(alphaVal)
-      return TextSubMode.Lower // shift returns to lower
-    }
-    // Try Mixed
-    const mixedVal = getCharValue(ch, TextSubMode.Mixed)
-    if (mixedVal !== -1) {
-      values.push(TEXT_SWITCH.LOWER_TO_MIXED) // latch to mixed
-      values.push(mixedVal)
-      return TextSubMode.Mixed
-    }
-    // Try Punctuation (shift)
-    const punctVal = getCharValue(ch, TextSubMode.Punctuation)
-    if (punctVal !== -1) {
-      values.push(TEXT_SWITCH.LOWER_TO_PUNCT_SHIFT) // shift to punct
-      values.push(punctVal)
-      return TextSubMode.Lower // shift returns to current mode
-    }
-  } else if (currentMode === TextSubMode.Mixed) {
-    // Try Punctuation (shift for single char)
-    const punctVal = getCharValue(ch, TextSubMode.Punctuation)
-    if (punctVal !== -1) {
-      values.push(TEXT_SWITCH.MIXED_TO_PUNCT_SHIFT) // PS - shift to punct
-      values.push(punctVal)
-      return TextSubMode.Mixed // shift returns to mixed
-    }
-    // Try Alpha
-    const alphaVal = getCharValue(ch, TextSubMode.Alpha)
-    if (alphaVal !== -1) {
-      values.push(TEXT_SWITCH.MIXED_TO_ALPHA) // AL - latch to alpha
-      values.push(alphaVal)
-      return TextSubMode.Alpha
-    }
-    // Try Lower (Mixed -> Alpha -> Lower)
-    const lowerVal = getCharValue(ch, TextSubMode.Lower)
-    if (lowerVal !== -1) {
-      values.push(TEXT_SWITCH.MIXED_TO_ALPHA) // AL - latch to alpha first
-      values.push(TEXT_SWITCH.ALPHA_TO_LOWER) // LL - then latch to lower
-      values.push(lowerVal)
-      return TextSubMode.Lower
-    }
-  } else if (currentMode === TextSubMode.Punctuation) {
-    // Try Alpha
-    const alphaVal = getCharValue(ch, TextSubMode.Alpha)
-    if (alphaVal !== -1) {
-      values.push(TEXT_SWITCH.PUNCT_TO_ALPHA) // latch to alpha
-      values.push(alphaVal)
-      return TextSubMode.Alpha
-    }
-    // Alpha -> Lower
-    const lowerVal = getCharValue(ch, TextSubMode.Lower)
-    if (lowerVal !== -1) {
-      values.push(TEXT_SWITCH.PUNCT_TO_ALPHA) // latch to alpha first
-      values.push(TEXT_SWITCH.ALPHA_TO_LOWER) // then latch to lower
-      values.push(lowerVal)
-      return TextSubMode.Lower
-    }
-    // Alpha -> Mixed
-    const mixedVal = getCharValue(ch, TextSubMode.Mixed)
-    if (mixedVal !== -1) {
-      values.push(TEXT_SWITCH.PUNCT_TO_ALPHA) // latch to alpha first
-      values.push(TEXT_SWITCH.ALPHA_TO_MIXED) // then latch to mixed
-      values.push(mixedVal)
-      return TextSubMode.Mixed
+/**
+ * Convert text to a sequence of sub-codeword values using text compaction sub-modes.
+ *
+ * A greedy "switch when the current sub-mode cannot hold this character" pass
+ * is legal but wasteful: it shifts where a latch is cheaper (a run of
+ * punctuation costs one shift per character) and takes the long way round where
+ * a direct latch exists. This instead searches for the shortest sequence,
+ * carrying the cost of ending in each of the four sub-modes forwards through
+ * the string and picking the cheapest at the end — matching, sub-codeword for
+ * sub-codeword, what BWIPP produces for the same input.
+ */
+function textToSubCodewords(text: string): number[] {
+  const length = text.length
+  if (length === 0) return []
+
+  const cost: number[][] = []
+  const back: (TextStep | undefined)[][] = []
+  for (let i = 0; i <= length; i++) {
+    cost.push([Infinity, Infinity, Infinity, Infinity])
+    back.push([undefined, undefined, undefined, undefined])
+  }
+  // Text compaction always starts in Alpha
+  cost[0]![TextSubMode.Alpha] = 0
+
+  for (let i = 0; i < length; i++) {
+    relaxLatches(cost[i]!, back[i]!, i)
+    const ch = text[i]!
+
+    for (const to of SUB_MODES) {
+      const value = getCharValue(ch, to)
+      if (value === -1) continue
+
+      // Already in `to`: the character costs one sub-codeword
+      const direct = cost[i]![to]! + 1
+      if (direct < cost[i + 1]![to]!) {
+        cost[i + 1]![to] = direct
+        back[i + 1]![to] = { emit: [value], index: i, mode: to }
+      }
+
+      // Or shift into `to` for this character alone and stay where we are
+      for (const from of SUB_MODES) {
+        if (from === to) continue
+        const shift = SHIFT_CODE[from]![to]
+        if (shift === undefined) continue
+        const shifted = cost[i]![from]! + 2
+        if (shifted < cost[i + 1]![from]!) {
+          cost[i + 1]![from] = shifted
+          back[i + 1]![from] = { emit: [shift, value], index: i, mode: from }
+        }
+      }
     }
   }
 
-  // Fallback: encode as byte value (shouldn't reach here for text-compactable chars)
-  values.push(getCharValue(" ", currentMode) !== -1 ? getCharValue(" ", currentMode) : 26)
-  return currentMode
+  let bestMode: TextSubMode = TextSubMode.Alpha
+  for (const mode of SUB_MODES) {
+    if (cost[length]![mode]! < cost[length]![bestMode]!) bestMode = mode
+  }
+
+  // Walk the back pointers to the start, then flip the collected runs around
+  const chunks: (readonly number[])[] = []
+  let index = length
+  let mode = bestMode
+  for (;;) {
+    const step = back[index]![mode]
+    if (step === undefined) break
+    chunks.push(step.emit)
+    index = step.index
+    mode = step.mode
+  }
+  chunks.reverse()
+
+  const values: number[] = []
+  for (const chunk of chunks) values.push(...chunk)
+  return values
 }
 
 /** Get the sub-codeword value for a character in a given sub-mode, or -1 if not available */

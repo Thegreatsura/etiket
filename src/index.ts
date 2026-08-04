@@ -202,7 +202,12 @@ export {
   maxicodePNG,
   maxicodePNGDataURI,
 } from "./_png"
-export type { BarcodePNGOptions, MatrixPNGOptions, PostalPNGOptions } from "./renderers/png/types"
+export type {
+  BarcodePNGOptions,
+  ColorMatrixPNGOptions,
+  MatrixPNGOptions,
+  PostalPNGOptions,
+} from "./renderers/png/types"
 export {
   renderBarcodeRaster,
   renderMatrixRaster,
@@ -226,6 +231,7 @@ export type { PostalSVGOptions, PostalBar } from "./renderers/svg/postal"
 export { renderColorMatrixSVG } from "./renderers/svg/color-matrix"
 export type { ColorMatrixSVGOptions } from "./renderers/svg/color-matrix"
 export { renderText } from "./renderers/text"
+export type { TextRenderOptions } from "./renderers/text"
 export { svgToDataURI, svgToBase64, svgToBase64Raw } from "./renderers/data-uri"
 export { optimizeSVG } from "./renderers/svg/optimize"
 

@@ -50,6 +50,6 @@ export { renderMatrixSVG, renderMaxiCodeSVG } from "./renderers/svg/matrix"
 export type { MatrixSVGOptions } from "./renderers/svg/matrix"
 export { renderColorMatrixSVG } from "./renderers/svg/color-matrix"
 export type { ColorMatrixSVGOptions } from "./renderers/svg/color-matrix"
-export type { MatrixPNGOptions } from "./renderers/png/types"
+export type { ColorMatrixPNGOptions, MatrixPNGOptions } from "./renderers/png/types"
 
 export { EtiketError, InvalidInputError, CapacityError, CheckDigitError } from "./errors"

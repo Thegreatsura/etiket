@@ -330,10 +330,9 @@ function emitLatch(
  *
  * Binary shift encoding:
  * 1. Emit BS code in current mode (code 31 for Upper/Lower/Mixed, code 15 for Digit)
- * 2. If length 1-31:  emit 5-bit length
- *    If length 32-62: emit 5-bit 0 followed by 6-bit (length - 31)
- *    (simplified: we cap at 62 and start a new BS for longer runs;
- *     the spec allows up to 2047 via 11-bit extended length but that's rare)
+ * 2. Length 1-31 goes in the 5-bit field directly; a longer run signals 0
+ *    there and carries (length - 31) in a further 11 bits, so one run holds up
+ *    to 2078 bytes. Anything longer starts another run.
  * 3. Emit each byte as 8 bits
  *
  * After binary shift, the mode returns to the mode before the shift.

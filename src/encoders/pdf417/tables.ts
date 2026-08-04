@@ -308,7 +308,7 @@ export const TEXT_LOWER_MAP: Record<string, number> = {
  * Text compaction Mixed sub-mode character mapping.
  * 0-9 = 0-9, & = 10, CR = 11, TAB = 12, , = 13, : = 14,
  * # = 15, - = 16, . = 17, $ = 18, / = 19, + = 20, % = 21,
- * * = 22, = = 23, ^ = 24, (unused = 25), space = 26
+ * * = 22, = = 23, ^ = 24, PL = 25, space = 26
  */
 // prettier-ignore
 export const TEXT_MIXED_MAP: Record<string, number> = {
@@ -333,11 +333,18 @@ export const TEXT_PUNCT_MAP: Record<string, number> = {
 }
 
 /**
- * Sub-mode switching codeword values in text compaction (ISO 15438 Table 14).
+ * Sub-mode switching codeword values in text compaction (ISO/IEC 15438 Table 4).
+ *
+ * The value of a switch is read in the sub-mode it is *issued from*, which is
+ * why the same number means different things in different rows:
+ *
  * From Alpha: LL(27)=Latch Lower, ML(28)=Latch Mixed, PS(29)=Shift Punct
  * From Lower: AS(27)=Shift Alpha, ML(28)=Latch Mixed, PS(29)=Shift Punct
- * From Mixed: PL(27)=Latch Punct, AL(28)=Latch Alpha, PS(29)=Shift Punct
+ * From Mixed: PL(25)=Latch Punct, LL(27)=Latch Lower, AL(28)=Latch Alpha, PS(29)=Shift Punct
  * From Punct: PAL(29)=Latch Alpha
+ *
+ * Alpha and Lower have no direct latch to Punctuation, and Lower has none back
+ * to Alpha; those transitions go through Mixed.
  */
 export const TEXT_SWITCH = {
   // from Alpha
@@ -351,7 +358,8 @@ export const TEXT_SWITCH = {
   LOWER_TO_PUNCT_SHIFT: 29, // PS - single-char shift to punct
 
   // from Mixed
-  MIXED_TO_PUNCT_LATCH: 27, // PL - latch to punct
+  MIXED_TO_PUNCT_LATCH: 25, // PL - latch to punct
+  MIXED_TO_LOWER: 27, // LL - latch to lower
   MIXED_TO_ALPHA: 28, // AL - latch to alpha
   MIXED_TO_PUNCT_SHIFT: 29, // PS - single-char shift to punct
 

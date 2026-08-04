@@ -46,7 +46,7 @@ interface ECBlockInfo {
 // prettier-ignore
 const EC_TABLE: Record<ErrorCorrectionLevel, ECBlockInfo[]> = {
   L: [
-    { totalDataCodewords: 0, ecCodewordsPerBlock: 0, group1Blocks: 0, group1DataCW: 0, group2Blocks: 0, group2DataCW: 0 }, // v0 placeholder
+    { totalDataCodewords: 0, ecCodewordsPerBlock: 0, group1Blocks: 0, group1DataCW: 0, group2Blocks: 0, group2DataCW: 0 }, // index 0 is unused: versions are 1-40
     { totalDataCodewords: 19, ecCodewordsPerBlock: 7, group1Blocks: 1, group1DataCW: 19, group2Blocks: 0, group2DataCW: 0 }, // v1
     { totalDataCodewords: 34, ecCodewordsPerBlock: 10, group1Blocks: 1, group1DataCW: 34, group2Blocks: 0, group2DataCW: 0 }, // v2
     { totalDataCodewords: 55, ecCodewordsPerBlock: 15, group1Blocks: 1, group1DataCW: 55, group2Blocks: 0, group2DataCW: 0 }, // v3
@@ -276,7 +276,7 @@ export const ALIGNMENT_POSITIONS: number[][] = [
  */
 // prettier-ignore
 export const REMAINDER_BITS: number[] = [
-  0, // v0 placeholder
+  0, // index 0 is unused: versions are 1-40
   0, 7, 7, 7, 7, 7, 0, 0, 0, 0, // v1-v10
   0, 0, 0, 3, 3, 3, 3, 3, 3, 3, // v11-v20
   4, 4, 4, 4, 4, 4, 0, 0, 0, 0, // v21-v30

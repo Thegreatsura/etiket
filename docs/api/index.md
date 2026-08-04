@@ -1,6 +1,7 @@
 # API Reference
 
-Every symbol `etiket` exports, grouped by what it does. 174 values and 58 types.
+Every symbol `etiket` exports, grouped by what it does — every function,
+constant and type, with its signature and a worked example.
 
 If you are looking for the exported **types**, see
 [TypeScript types](/getting-started/typescript). For the payload helpers see
@@ -12,19 +13,19 @@ If you are looking for the exported **types**, see
 Everything is available from the package root. The sub-paths exist so a bundle
 that only draws QR codes does not carry the Data Matrix tables.
 
-| Import              | Contains                                                       |
-| :------------------ | :------------------------------------------------------------- |
-| `etiket`            | Everything below                                               |
-| `etiket/barcode`    | 1D barcodes, industry encoders, validators, errors             |
-| `etiket/postal`     | POSTNET, PLANET, RM4SCC, KIX, Australia Post, Japan Post, IMb  |
-| `etiket/qr`         | QR, Micro QR, rMQR, the payload helpers, QR PNG, QR validation |
-| `etiket/2d`         | Every 2D and stacked symbology                                 |
-| `etiket/datamatrix` | Data Matrix and GS1 Data Matrix                                |
-| `etiket/pdf417`     | PDF417 and MicroPDF417                                         |
-| `etiket/aztec`      | Aztec Code                                                     |
-| `etiket/png`        | PNG output for every family                                    |
-| `etiket/errors`     | `EtiketError` and its subclasses                               |
-| `etiket/validators` | `validateBarcode`, `validateQRInput` and friends               |
+| Import              | Contains                                                                 |
+| :------------------ | :----------------------------------------------------------------------- |
+| `etiket`            | Everything below                                                         |
+| `etiket/barcode`    | 1D barcodes, GS1 DataBar, industry encoders, validators, errors          |
+| `etiket/postal`     | POSTNET, PLANET, RM4SCC, KIX, Australia Post, Japan Post, IMb            |
+| `etiket/qr`         | QR, Micro QR, rMQR, the payload helpers, QR PNG, QR validation           |
+| `etiket/2d`         | MaxiCode, DotCode, Han Xin, MicroPDF417, Codablock F, Code 16K, JAB Code |
+| `etiket/datamatrix` | Data Matrix and GS1 Data Matrix                                          |
+| `etiket/pdf417`     | PDF417 and MicroPDF417                                                   |
+| `etiket/aztec`      | Aztec Code                                                               |
+| `etiket/png`        | PNG output for every family                                              |
+| `etiket/errors`     | `EtiketError` and its subclasses                                         |
+| `etiket/validators` | `validateBarcode`, `validateQRInput` and friends                         |
 
 ```ts
 import { barcode } from "etiket/barcode"
@@ -101,7 +102,7 @@ encodeBars("12345", { type: "code128" })
 ```ts
 import { barcode } from "etiket"
 
-barcode("12345678", {
+barcode("1234567890123", {
   type: "itf14",
   moduleSize: 3,
   height: 80,
@@ -142,10 +143,10 @@ import { postal, postalDataURI, postalBase64, encodePostal } from "etiket"
 
 postal("12345-6789", { type: "postnet" })
 postal("SN34RD1A", { type: "rm4scc", height: 30 })
-postal("1234567890", { type: "auspost", fcc: "11" })
+postal("12345678", { type: "auspost", fcc: "11" })
 postal("01234567094987654321", { type: "imb", routingCode: "01234567891" })
 
-postalDataURI("12345", { type: "planet" }).startsWith("data:image/svg+xml,") // true
+postalDataURI("12345678901", { type: "planet" }).startsWith("data:image/svg+xml,") // true
 postalBase64("12345", { type: "postnet" }).includes("base64") // true
 
 encodePostal("SN34RD1A", { type: "rm4scc" })
@@ -232,6 +233,7 @@ accessibility fields — on top of its own encoder options.
 | `gs1databarStacked(text, options?)`         | —                                                               |
 | `gs1databarStackedOmni(text, options?)`     | —                                                               |
 | `gs1databarExpandedStacked(text, options?)` | `segments`                                                      |
+| `gs1composite(linearType, data, options?)`  | `type`, `columns`, `linear`, `linearWidth`                      |
 
 ```ts
 import {
@@ -251,6 +253,7 @@ import {
   gs1databarStacked,
   gs1databarStackedOmni,
   gs1databarExpandedStacked,
+  gs1composite,
 } from "etiket"
 
 datamatrix("Hello", { shape: "rectangle", dmre: true, size: 200 })
@@ -269,7 +272,13 @@ jabcode("Hello", { colors: 8 })
 gs1databarStacked("0361414199999")
 gs1databarStackedOmni("0361414199999")
 gs1databarExpandedStacked("(01)90012345678908(3103)001750", { segments: 4 })
+gs1composite("databar-omni", "(01)09521234543213|(11)990102")
 ```
+
+`gs1composite()` is the odd one out: it takes the linear symbology as its first
+argument and a `"<linear data>|<composite data>"` string as its second, and
+returns the complete symbol — the linear component with its linkage flag set,
+the separator, and the 2D component above it.
 
 MaxiCode modes 2 and 3 carry a structured primary message and need the postal
 fields; a malformed postal code is an error rather than a silently mangled
@@ -394,14 +403,18 @@ Every family has a `*PNG` function returning a `Uint8Array` and a matching
 `*PNGDataURI` returning `data:image/png;base64,…`. See
 [PNG output](/rendering/png) for the options and the pixel format.
 
-| Family  | Functions                                                                             |
-| :------ | :------------------------------------------------------------------------------------ |
-| 1D      | `barcodePNG`                                                                          |
-| Postal  | `postalPNG`                                                                           |
-| QR      | `qrcodePNG`, `microqrPNG`, `rmqrPNG`                                                  |
-| 2D      | `datamatrixPNG`, `gs1datamatrixPNG`, `pdf417PNG`, `micropdf417PNG`, `aztecPNG`        |
-| Other   | `maxicodePNG`, `dotcodePNG`, `hanxinPNG`, `codablockfPNG`, `code16kPNG`, `jabcodePNG` |
-| DataBar | `gs1databarStackedPNG`, `gs1databarStackedOmniPNG`, `gs1databarExpandedStackedPNG`    |
+| Family      | `*PNG`                                                                             | `*PNGDataURI`                                                                                           |
+| :---------- | :--------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------ |
+| 1D          | `barcodePNG`                                                                       | `barcodePNGDataURI`                                                                                     |
+| Postal      | `postalPNG`                                                                        | `postalPNGDataURI`                                                                                      |
+| QR          | `qrcodePNG`, `microqrPNG`, `rmqrPNG`                                               | `qrcodePNGDataURI`, `microqrPNGDataURI`, `rmqrPNGDataURI`                                               |
+| Data Matrix | `datamatrixPNG`, `gs1datamatrixPNG`                                                | `datamatrixPNGDataURI`, `gs1datamatrixPNGDataURI`                                                       |
+| PDF417      | `pdf417PNG`, `micropdf417PNG`                                                      | `pdf417PNGDataURI`, `micropdf417PNGDataURI`                                                             |
+| Aztec       | `aztecPNG`                                                                         | `aztecPNGDataURI`                                                                                       |
+| Stacked     | `codablockfPNG`, `code16kPNG`                                                      | `codablockfPNGDataURI`, `code16kPNGDataURI`                                                             |
+| Other       | `maxicodePNG`, `dotcodePNG`, `hanxinPNG`, `jabcodePNG`                             | `maxicodePNGDataURI`, `dotcodePNGDataURI`, `hanxinPNGDataURI`, `jabcodePNGDataURI`                      |
+| DataBar     | `gs1databarStackedPNG`, `gs1databarStackedOmniPNG`, `gs1databarExpandedStackedPNG` | `gs1databarStackedPNGDataURI`, `gs1databarStackedOmniPNGDataURI`, `gs1databarExpandedStackedPNGDataURI` |
+| Composite   | `gs1compositePNG`                                                                  | `gs1compositePNGDataURI`                                                                                |
 
 ```ts
 import { qrcodePNG, barcodePNG, qrcodePNGDataURI } from "etiket"
@@ -409,6 +422,18 @@ import { qrcodePNG, barcodePNG, qrcodePNGDataURI } from "etiket"
 qrcodePNG("Hello", { moduleSize: 8, margin: 4 }) instanceof Uint8Array // true
 barcodePNG("12345", { moduleSize: 3, height: 100 }) instanceof Uint8Array // true
 qrcodePNGDataURI("Hello").startsWith("data:image/png;base64,") // true
+```
+
+`gs1compositePNG` and `gs1compositePNGDataURI` take the linear symbology first,
+matching `gs1composite()`:
+
+```ts
+import { gs1compositePNG, gs1compositePNGDataURI } from "etiket"
+
+gs1compositePNG("databar-omni", "(01)09521234543213|(11)990102", { moduleSize: 4 })
+
+const uri = gs1compositePNGDataURI("databar-omni", "(01)09521234543213|(11)990102")
+uri.startsWith("data:image/png;base64,") // true
 ```
 
 ## Renderers
@@ -542,16 +567,17 @@ encodePlessey("12345")
 
 ### GS1 DataBar and Composite
 
-| Function                                          | Returns              |
-| :------------------------------------------------ | :------------------- |
-| `encodeGS1DataBarOmni(gtin, options?)`            | `number[]`           |
-| `encodeGS1DataBarTruncated(gtin, options?)`       | `number[]`           |
-| `encodeGS1DataBarLimited(gtin, options?)`         | `number[]`           |
-| `encodeGS1DataBarExpanded(data, options?)`        | `number[]`           |
-| `encodeGS1DataBarStacked(gtin, options?)`         | `boolean[][]`        |
-| `encodeGS1DataBarStackedOmni(gtin, options?)`     | `boolean[][]`        |
-| `encodeGS1DataBarExpandedStacked(data, options?)` | `boolean[][]`        |
-| `encodeGS1Composite(data, options?)`              | `GS1CompositeResult` |
+| Function                                               | Returns                                          |
+| :----------------------------------------------------- | :----------------------------------------------- |
+| `encodeGS1DataBarOmni(gtin, options?)`                 | `number[]`                                       |
+| `encodeGS1DataBarTruncated(gtin, options?)`            | `number[]`                                       |
+| `encodeGS1DataBarLimited(gtin, options?)`              | `number[]`                                       |
+| `encodeGS1DataBarExpanded(data, options?)`             | `number[]`                                       |
+| `encodeGS1DataBarStacked(gtin, options?)`              | `boolean[][]`                                    |
+| `encodeGS1DataBarStackedOmni(gtin, options?)`          | `boolean[][]`                                    |
+| `encodeGS1DataBarExpandedStacked(data, options?)`      | `boolean[][]`                                    |
+| `encodeGS1Composite(data, options?)`                   | `GS1CompositeResult` — the 2D component only     |
+| `encodeGS1CompositeSymbol(linearType, data, options?)` | `GS1CompositeSymbolResult` — the complete symbol |
 
 Every DataBar encoder takes `{ linkage?: boolean }`, which sets the flag saying
 a 2D composite component sits above the symbol. Expanded Stacked also takes
@@ -567,6 +593,7 @@ import {
   encodeGS1DataBarStackedOmni,
   encodeGS1DataBarExpandedStacked,
   encodeGS1Composite,
+  encodeGS1CompositeSymbol,
 } from "etiket"
 
 encodeGS1DataBarOmni("0361414199999")
@@ -583,7 +610,19 @@ composite.rows
 composite.cols
 composite.columns
 composite.composite // boolean[][]
+
+const symbol = encodeGS1CompositeSymbol("databar-omni", "(01)09521234543213|(11)990102")
+symbol.linearType // "databar-omni"
+symbol.matrix.length === symbol.rowHeights.length // true
+symbol.linear.length > 0 // true — the linear component's bar/space widths
+symbol.linearOffset >= 0 // true
 ```
+
+`encodeGS1CompositeSymbol()` splits its `data` argument on `|`: the linear
+component's element string comes first, the composite component's second. It
+returns the whole symbol — `matrix` with a `rowHeights` entry per row — plus the
+pieces (`composite`, `separator`, `linear`) if you want to lay them out
+yourself.
 
 ### Postal
 
@@ -607,7 +646,7 @@ import {
 } from "etiket"
 
 encodePOSTNET("12345-6789")
-encodePLANET("12345")
+encodePLANET("12345678901")
 encodeRM4SCC("SN34RD1A")
 encodeKIX("2500GG75XX")
 encodeAustraliaPost("59", "12345678", "ABC", { custInfoEncoding: "character" })
@@ -621,23 +660,24 @@ or `"numeric"` (2 bars per digit).
 
 ### 2D
 
-| Function                              | Returns                                 |
-| :------------------------------------ | :-------------------------------------- |
-| `encodeQR(text, options?)`            | `boolean[][]`                           |
-| `encodeQRSequence(text, options?)`    | `boolean[][][]`                         |
-| `encodeMicroQR(text, options?)`       | `boolean[][]`                           |
-| `encodeRMQR(text, options?)`          | `boolean[][]`                           |
-| `encodeDataMatrix(text, options?)`    | `boolean[][]`                           |
-| `encodeGS1DataMatrix(text, options?)` | `boolean[][]`                           |
-| `encodePDF417(text, options?)`        | `{ matrix, rows, cols }`                |
-| `encodeMicroPDF417(text, options?)`   | `{ matrix, rows, cols }`                |
-| `encodeAztec(text, options?)`         | `boolean[][]`                           |
-| `encodeMaxiCode(text, options?)`      | `boolean[][]` — 33×30                   |
-| `encodeDotCode(text, options?)`       | `boolean[][]`                           |
-| `encodeHanXin(text, options?)`        | `boolean[][]`                           |
-| `encodeCodablockF(text, options?)`    | `{ matrix, rows, cols, separatorRows }` |
-| `encodeCode16K(text)`                 | `{ matrix, rows, cols, separatorRows }` |
-| `encodeJABCode(text, options?)`       | `JABCodeResult`                         |
+| Function                               | Returns                                   |
+| :------------------------------------- | :---------------------------------------- |
+| `encodeQR(text, options?)`             | `boolean[][]`                             |
+| `encodeQRSequence(text, options?)`     | `boolean[][][]`                           |
+| `encodeMicroQR(text, options?)`        | `boolean[][]`                             |
+| `encodeRMQR(text, options?)`           | `boolean[][]`                             |
+| `encodeDataMatrix(text, options?)`     | `boolean[][]`                             |
+| `encodeGS1DataMatrix(text, options?)`  | `boolean[][]`                             |
+| `encodePDF417(text, options?)`         | `{ matrix, rows, cols }`                  |
+| `encodePDF417Sequence(text, options?)` | `{ matrix, rows, cols }[]` — Macro PDF417 |
+| `encodeMicroPDF417(text, options?)`    | `{ matrix, rows, cols }`                  |
+| `encodeAztec(text, options?)`          | `boolean[][]`                             |
+| `encodeMaxiCode(text, options?)`       | `boolean[][]` — 33×30                     |
+| `encodeDotCode(text, options?)`        | `boolean[][]`                             |
+| `encodeHanXin(text, options?)`         | `boolean[][]`                             |
+| `encodeCodablockF(text, options?)`     | `{ matrix, rows, cols, separatorRows }`   |
+| `encodeCode16K(text)`                  | `{ matrix, rows, cols, separatorRows }`   |
+| `encodeJABCode(text, options?)`        | `JABCodeResult`                           |
 
 ```ts
 import {
@@ -648,6 +688,7 @@ import {
   encodeDataMatrix,
   encodeGS1DataMatrix,
   encodePDF417,
+  encodePDF417Sequence,
   encodeMicroPDF417,
   encodeAztec,
   encodeMaxiCode,
@@ -665,6 +706,7 @@ encodeRMQR("Hello", { ecLevel: "M" })
 encodeDataMatrix("Hello", { shape: "auto", dmre: true })
 encodeGS1DataMatrix("(01)09501101020917")
 encodePDF417("Hello", { columns: 4 }).rows
+encodePDF417Sequence("A".repeat(3000), { symbols: 3 }).length // 3
 encodeMicroPDF417("Hello", { columns: 2 }).cols
 encodeAztec("Hello", { ecPercent: 33 })
 encodeMaxiCode("Hello", { mode: 4 }).length // 33
@@ -711,13 +753,13 @@ import {
 } from "etiket"
 
 const primary = encodeHIBCPrimary("A123", "12345", 0)
-primary // "+A123123450<check>"
+primary // "+A123123450T"
 barcode(primary, { type: "code128" }).startsWith("<svg") // true
 
 encodeHIBCSecondary("251231", "LOT42")
 encodeHIBCConcatenated("A123", "12345", { expiry: "251231", lot: "LOT42" })
 
-encodeISBT128DIN("US", "12345", "24", "000001") // "=US12345 24 000001<check>"
+encodeISBT128DIN("US", "12345", "24", "000001") // "=US12345240000016"
 encodeISBT128Component("E0791")
 encodeISBT128Expiry("251231") // "&251231"
 encodeISBT128BloodGroup("51") // "%51"
@@ -741,4 +783,19 @@ jabcode("Hello", { palette: JAB_COLORS_8, colors: 8 })
 
 DATAMATRIX_SYMBOL_SIZES.filter((s) => s.dmre).length // the ISO 21471 sizes
 DATAMATRIX_SYMBOL_SIZES[0]?.rows // 10
+```
+
+`BARCODE_TYPES` and `ENCODE_TYPES` are the runtime counterparts of the
+`BarcodeType` and `EncodeType` unions — the list a `<select>` or a CLI
+completion needs, without hand-maintaining a second copy.
+
+```ts
+import { BARCODE_TYPES, ENCODE_TYPES, barcode } from "etiket"
+
+BARCODE_TYPES.includes("code128") // true
+ENCODE_TYPES.length > BARCODE_TYPES.length // true
+
+for (const type of BARCODE_TYPES.slice(0, 1)) {
+  barcode("12345678", { type }).startsWith("<svg") // true
+}
 ```

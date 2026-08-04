@@ -208,6 +208,23 @@ function selectMicroVersion(
     }
     const cap = CAPACITY[v]?.[ecKey]
     if (!cap) throw new CapacityError(`Micro QR M${v} does not support EC level ${ecKey}`)
+
+    // A pinned version still has to hold the data. M1 is numeric only and M2
+    // adds alphanumeric, so the mode has to be checked as well as the length —
+    // without this the symbol comes out silently truncated.
+    // The table records an unavailable mode as a capacity of 0
+    const limit = cap[mode as keyof MicroQRCapacity]
+    if (typeof limit !== "number" || limit === 0) {
+      throw new InvalidInputError(
+        `Micro QR M${v} does not support ${mode} mode — M1 is numeric only, M2 adds alphanumeric, M3 and M4 add byte and kanji`,
+      )
+    }
+    const pinnedLen = mode === "byte" ? new TextEncoder().encode(text).length : text.length
+    if (pinnedLen > limit) {
+      throw new CapacityError(
+        `Data too long for Micro QR M${v} at EC level ${ecKey === "_" ? "none" : ecKey}: ${pinnedLen} ${mode} characters, capacity is ${limit}`,
+      )
+    }
     return { version: v, cap, ecKey }
   }
 
