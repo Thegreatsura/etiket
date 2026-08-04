@@ -7,6 +7,7 @@ import { MODE_INDICATOR } from "./types"
 import { getECInfo, getCharCountBits } from "./tables"
 import { getDataCapacityBits, selectMode } from "./version"
 import { optimizeSegments } from "./segment"
+import { gs1Payload } from "./gs1"
 import {
   encodeNumericData,
   encodeAlphanumericData,
@@ -77,9 +78,12 @@ export function planEncoding(
   options: QRCodeOptions,
 ): EncodingPlan {
   const forcedMode = options.mode && options.mode !== "auto" ? options.mode : undefined
+  // GS1 symbols carry AI element strings, not the parenthesised form the
+  // caller wrote
+  const payload = options.gs1 ? gs1Payload(text) : text
 
   if (options.version !== undefined) {
-    const segments = segmentsFor(text, options.version, forcedMode)
+    const segments = segmentsFor(payload, options.version, forcedMode)
     const needed = headerBits(options) + totalBits(segments, options.version)
     const capacity = getDataCapacityBits(options.version, ecLevel)
     if (needed > capacity) {
@@ -91,7 +95,7 @@ export function planEncoding(
   }
 
   for (let version = 1; version <= 40; version++) {
-    const segments = segmentsFor(text, version, forcedMode)
+    const segments = segmentsFor(payload, version, forcedMode)
     if (
       headerBits(options) + totalBits(segments, version) <=
       getDataCapacityBits(version, ecLevel)
@@ -184,6 +188,8 @@ function headerBits(options: QRCodeOptions): number {
   let bits = 0
   if (options.structuredAppend) bits += 4 + 4 + 4 + 8
   if (options.eci !== undefined) bits += 4 + eciDesignatorBits(options.eci)
+  if (options.gs1) bits += 4
+  else if (options.applicationIndicator !== undefined) bits += 4 + 8
   return bits
 }
 
@@ -220,6 +226,14 @@ function appendHeaders(bits: number[], options: QRCodeOptions): void {
     pushBits(bits, sa.parity & 0xff, 8)
   }
 
+  if (options.gs1) {
+    // FNC1 in the first position: the data is GS1 element strings
+    pushBits(bits, MODE_INDICATOR.fnc1First, 4)
+  } else if (options.applicationIndicator !== undefined) {
+    pushBits(bits, MODE_INDICATOR.fnc1Second, 4)
+    pushBits(bits, applicationIndicatorValue(options.applicationIndicator), 8)
+  }
+
   if (options.eci !== undefined) {
     const designatorBits = eciDesignatorBits(options.eci)
     pushBits(bits, MODE_INDICATOR.eci, 4)
@@ -232,6 +246,20 @@ function appendHeaders(bits: number[], options: QRCodeOptions): void {
       pushBits(bits, 0b110_00000_00000000_00000000 | options.eci, 24)
     }
   }
+}
+
+/**
+ * The 8-bit value that follows an FNC1 second-position indicator.
+ *
+ * Two digits are written as their plain value 0-99; a single letter as its
+ * ASCII code plus 100, which lands it in 165-190 for A-Z and 197-222 for a-z.
+ */
+function applicationIndicatorValue(indicator: string): number {
+  if (/^\d{2}$/.test(indicator)) return Number(indicator)
+  if (/^[a-z]$/i.test(indicator)) return indicator.charCodeAt(0) + 100
+  throw new InvalidInputError(
+    `Application indicator must be two digits or a single letter, got "${indicator}"`,
+  )
 }
 
 /** Append one segment's mode indicator, character count and payload */

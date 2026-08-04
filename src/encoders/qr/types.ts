@@ -31,6 +31,18 @@ export interface QRCodeOptions {
    * character set of the data, e.g. 26 for UTF-8 or 3 for ISO-8859-1.
    */
   eci?: number
+  /**
+   * Encode the text as GS1 element strings: the input is a parenthesised AI
+   * string such as `"(01)09501101020917(10)LOT42"`, and the symbol carries the
+   * FNC1 first-position flag that tells a reader so.
+   */
+  gs1?: boolean
+  /**
+   * Application indicator for FNC1 in the second position — either two digits
+   * (`"12"`) or a single letter (`"A"`), per the AIM application agreement the
+   * data follows. Ignored when `gs1` is set.
+   */
+  applicationIndicator?: string
 }
 
 export interface QRSegment {

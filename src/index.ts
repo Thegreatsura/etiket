@@ -43,6 +43,7 @@ export {
   event,
   swissQR,
   gs1DigitalLink,
+  gs1qr,
 } from "./_helpers"
 
 // --- Types ---
