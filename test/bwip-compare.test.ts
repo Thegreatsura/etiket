@@ -82,15 +82,6 @@ const DIVERGENT: Record<string, string> = {
     "differs: etiket picks 1x11 where BWIPP picks 1x14 for the same data; where both pick " +
     "the same variant the module pattern is identical",
 
-  "codablock-f":
-    "#100 — the codewords now match BWIPP exactly; etiket returns only the data rows " +
-    "while BWIPP emits 2r+1 rows including the separators, so the grids differ in height " +
-    "until the renderers support per-row heights (#140)",
-
-  code16k:
-    "#99 — etiket emits bare Code 128 rows (2 x 112 modules); BWIPP emits 5 x 81 with the " +
-    "Code 16K start/stop pairs, mode character and separator rows",
-
   dotcode:
     "#101 — no dot-placement or masking algorithm: symbol sizes disagree and, where they " +
     "agree, every row differs (etiket also leaves the last rows completely blank)",
@@ -432,7 +423,8 @@ describe("bwip-js cross-verification: stacked and 2D", () => {
     format: "code16k",
     payloads: ["ABC123", "Hello", "123456789012"],
     etiket: (p) => encodeCode16K(p).matrix,
-    bwip: (p) => bwipMatrix("code16k", p),
+    // BWIPP frames Code 16K with a 10 module quiet zone and a trailing column
+    bwip: (p) => bwipMatrix("code16k", p).map((row) => row.slice(10, 10 + 70)),
   })
 
   runMatrix({

@@ -147,9 +147,37 @@ const PATTERNS: number[][] = [
 const STOP_PATTERN = [2, 3, 3, 1, 1, 1, 2]
 
 export interface CodablockFResult {
+  /**
+   * The complete symbol, including the separator rows above, below and between
+   * the data rows.
+   */
   matrix: boolean[][]
+  /** Number of data rows (the matrix has `2 * rows + 1` rows in total) */
   rows: number
   cols: number
+  /**
+   * Indices in `matrix` of the separator rows, which render 1 module tall
+   * while the data rows render at the full row height.
+   */
+  separatorRows: number[]
+}
+
+/** The solid separator that closes the symbol top and bottom. */
+function solidSeparator(width: number): boolean[] {
+  return Array.from<boolean>({ length: width }).fill(true)
+}
+
+/**
+ * The separator between two data rows. Its ends carry a fixed pattern so a
+ * reader can tell the rows apart; the middle is solid.
+ */
+function innerSeparator(width: number): boolean[] {
+  const left = [1, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0]
+  const right = [1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0, 1, 1]
+  const middle = Array.from<number>({
+    length: Math.max(0, width - left.length - right.length),
+  }).fill(1)
+  return [...left, ...middle, ...right].slice(0, width).map((m) => m === 1)
 }
 
 /** Code A value for a character, or -1 when Code A cannot represent it. */
@@ -419,14 +447,26 @@ export function encodeCodablockF(text: string, options?: { columns?: number }): 
     cws[start + columns + 3] = csum % 103
   }
 
-  const matrix: boolean[][] = []
+  const dataRows: boolean[][] = []
   for (let x = 0; x < r; x++) {
-    matrix.push(modulesFor(cws.slice(x * rowLen, (x + 1) * rowLen)))
+    dataRows.push(modulesFor(cws.slice(x * rowLen, (x + 1) * rowLen)))
   }
+
+  const width = dataRows[0]?.length ?? 0
+  const matrix: boolean[][] = []
+  const separatorRows: number[] = []
+  for (const [index, row] of dataRows.entries()) {
+    separatorRows.push(matrix.length)
+    matrix.push(index === 0 ? solidSeparator(width) : innerSeparator(width))
+    matrix.push(row)
+  }
+  separatorRows.push(matrix.length)
+  matrix.push(solidSeparator(width))
 
   return {
     matrix,
     rows: r,
-    cols: matrix[0]?.length ?? 0,
+    cols: width,
+    separatorRows,
   }
 }

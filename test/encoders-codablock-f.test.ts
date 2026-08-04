@@ -61,6 +61,11 @@ function symbolCheck(text: string): [number, number] {
   return [k1, k2]
 }
 
+/** The data rows of a symbol, skipping the separators */
+function dataRows(result: { matrix: boolean[][] }): boolean[][] {
+  return result.matrix.filter((_, index) => index % 2 === 1)
+}
+
 describe("Codablock F", () => {
   it("encodes short text", () => {
     const result = encodeCodablockF("Hello")
@@ -137,7 +142,8 @@ describe("Codablock F symbol structure", () => {
 
   it("reports dimensions consistent with the matrix", () => {
     const result = encodeCodablockF("CODABLOCK")
-    expect(result.matrix).toHaveLength(result.rows)
+    expect(result.matrix).toHaveLength(2 * result.rows + 1)
+    expect(dataRows(result)).toHaveLength(result.rows)
     expect(result.matrix[0]).toHaveLength(result.cols)
   })
 })
@@ -152,7 +158,7 @@ describe("Codablock F row decoding", () => {
     const result = encodeCodablockF(digits, { columns: 8 })
     expect(result.rows).toBe(3)
 
-    const decoded = await Promise.all(result.matrix.map((row) => decodeRow(row)))
+    const decoded = await Promise.all(dataRows(result).map((row) => decodeRow(row)))
 
     // Each row is "<row indicator><data>"; the indicator is one Code C pair.
     expect(decoded[0]!.slice(2)).toBe(digits.slice(0, 16))
@@ -165,7 +171,7 @@ describe("Codablock F row decoding", () => {
 
   it("encodes the row count in row 0 and the row number afterwards", async () => {
     const result = encodeCodablockF(digits, { columns: 8 })
-    const decoded = await Promise.all(result.matrix.map((row) => decodeRow(row)))
+    const decoded = await Promise.all(dataRows(result).map((row) => decodeRow(row)))
 
     // Row 0 carries rows - 2, later rows carry their index + 42.
     expect(decoded[0]!.slice(0, 2)).toBe(String(result.rows - 2).padStart(2, "0"))
@@ -175,7 +181,7 @@ describe("Codablock F row decoding", () => {
 
   it("puts the K1/K2 symbol check characters at the end of the last row", async () => {
     const result = encodeCodablockF(digits, { columns: 8 })
-    const decoded = await Promise.all(result.matrix.map((row) => decodeRow(row)))
+    const decoded = await Promise.all(dataRows(result).map((row) => decodeRow(row)))
     const [k1, k2] = symbolCheck(digits)
 
     const tail = decoded[result.rows - 1]!.slice(10)
@@ -184,7 +190,7 @@ describe("Codablock F row decoding", () => {
 
   it("keeps every row a valid Code 128 symbol for text payloads", async () => {
     const result = encodeCodablockF("CODABLOCK F TEST DATA 42", { columns: 8 })
-    const decoded = await Promise.all(result.matrix.map((row) => decodeRow(row)))
+    const decoded = await Promise.all(dataRows(result).map((row) => decodeRow(row)))
     expect(decoded).toHaveLength(result.rows)
     // The indicator occupies one character in a Code A/Code B row.
     expect(decoded.map((row) => row.slice(1)).join("")).toContain("CODABLOCK")

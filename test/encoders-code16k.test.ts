@@ -68,6 +68,11 @@ function symbolChar(row: boolean[], index: number): string {
     .join("")
 }
 
+/** The data rows of a symbol, skipping the 1-module separators */
+function dataRows(result: { matrix: boolean[][] }): boolean[][] {
+  return result.matrix.filter((_, index) => index % 2 === 1)
+}
+
 describe("Code 16K", () => {
   it("encodes short text", () => {
     const result = encodeCode16K("Hello")
@@ -134,7 +139,7 @@ describe("Code 16K", () => {
     const result = encodeCode16K("The quick brown fox jumps over the lazy dog")
     expect(result.rows).toBeGreaterThan(2)
     for (let r = 0; r < result.rows; r++) {
-      const widths = elements(result.matrix[r]!)
+      const widths = elements(dataRows(result)[r]!)
       // 4 start elements + the 1 module bar + 5 x 6 character elements + 4 stop
       expect(widths).toHaveLength(39)
       expect(widths.slice(0, 4).join("")).toBe(START_PATTERNS[r])
@@ -146,19 +151,19 @@ describe("Code 16K", () => {
   it("starts row 0 with the mode character", () => {
     // mode character = (rows - 2) * 7 + mode
     // "Hello" -> 2 rows, set B (mode 1) -> value 1
-    expect(symbolChar(encodeCode16K("Hello").matrix[0]!, 0)).toBe("222122")
+    expect(symbolChar(dataRows(encodeCode16K("Hello"))[0]!, 0)).toBe("222122")
     // "1234567890" -> 2 rows, set C (mode 2) -> value 2
-    expect(symbolChar(encodeCode16K("1234567890").matrix[0]!, 0)).toBe("222221")
+    expect(symbolChar(dataRows(encodeCode16K("1234567890"))[0]!, 0)).toBe("222221")
     // "Hello World" -> 3 rows, set B (mode 1) -> value 8
-    expect(symbolChar(encodeCode16K("Hello World").matrix[0]!, 0)).toBe("132212")
+    expect(symbolChar(dataRows(encodeCode16K("Hello World"))[0]!, 0)).toBe("132212")
   })
 
   it("pads with the pad character, not a space", () => {
     // "Hello" fills 1 mode + 5 data of the 8 characters before the check pair,
     // so characters 6 and 7 (row 1, positions 1 and 2) are pads (value 103)
     const result = encodeCode16K("Hello")
-    expect(symbolChar(result.matrix[1]!, 1)).toBe("211412")
-    expect(symbolChar(result.matrix[1]!, 2)).toBe("211412")
+    expect(symbolChar(dataRows(result)[1]!, 1)).toBe("211412")
+    expect(symbolChar(dataRows(result)[1]!, 2)).toBe("211412")
   })
 
   it("ends with two check characters that depend on the whole symbol", () => {
@@ -166,7 +171,7 @@ describe("Code 16K", () => {
     // change anywhere alters the last two characters of the last row
     const a = encodeCode16K("Hello")
     const b = encodeCode16K("Hellp")
-    expect(symbolChar(a.matrix[1]!, 3)).not.toBe(symbolChar(b.matrix[1]!, 3))
-    expect(symbolChar(a.matrix[1]!, 4)).not.toBe(symbolChar(b.matrix[1]!, 4))
+    expect(symbolChar(dataRows(a)[1]!, 3)).not.toBe(symbolChar(dataRows(b)[1]!, 3))
+    expect(symbolChar(dataRows(a)[1]!, 4)).not.toBe(symbolChar(dataRows(b)[1]!, 4))
   })
 })

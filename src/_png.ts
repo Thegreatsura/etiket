@@ -272,7 +272,12 @@ export function codablockfPNG(
   options?: { columns?: number } & MatrixPNGOptions,
 ): Uint8Array {
   const { columns, ...pngOpts } = options ?? {}
-  return renderMatrixPNG(encodeCodablockF(text, { columns }).matrix, pngOpts)
+  const result = encodeCodablockF(text, { columns })
+  return renderMatrixPNG(result.matrix, {
+    rowHeight: 8,
+    ...pngOpts,
+    rowHeights: stackedRowHeights(result, pngOpts.rowHeight ?? 8),
+  })
 }
 
 /**
@@ -289,7 +294,24 @@ export function codablockfPNGDataURI(
  * Generate a Code 16K stacked barcode as PNG
  */
 export function code16kPNG(text: string, options?: MatrixPNGOptions): Uint8Array {
-  return renderMatrixPNG(encodeCode16K(text).matrix, options)
+  const result = encodeCode16K(text)
+  return renderMatrixPNG(result.matrix, {
+    rowHeight: 8,
+    ...options,
+    rowHeights: stackedRowHeights(result, options?.rowHeight ?? 8),
+  })
+}
+
+/**
+ * Row heights for a stacked symbology: data rows at the requested height, the
+ * separator rows at the single module the specification gives them.
+ */
+function stackedRowHeights(
+  result: { matrix: boolean[][]; separatorRows: number[] },
+  rowHeight: number,
+): number[] {
+  const separators = new Set(result.separatorRows)
+  return result.matrix.map((_, index) => (separators.has(index) ? 1 : rowHeight))
 }
 
 /**

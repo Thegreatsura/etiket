@@ -4,7 +4,7 @@
  */
 
 import type { ErrorCorrectionLevel } from "./types"
-import { getECInfo, getCharCountBits } from "./tables"
+import { getECInfo } from "./tables"
 import { isNumeric, isAlphanumeric } from "./mode"
 
 /** Calculate data capacity in bits for a given version and EC level */

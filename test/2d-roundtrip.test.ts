@@ -255,23 +255,16 @@ describe("rMQR round-trip (zxing-wasm)", () => {
     expect(await decodeMatrix(encodeRMQR("EC TEST", { ecLevel }))).toBe("EC TEST")
   })
 
-  // Version indices into RMQR_SIZES that do round-trip at both EC levels
   it.each([0, 1, 2, 3, 5, 16])("decodes version index %i", async (version) => {
     for (const ecLevel of ["M", "H"] as const) {
       expect(await decodeMatrix(encodeRMQR("A1", { version, ecLevel }))).toBe("A1")
     }
   })
 
-  /**
-   * Expected divergence — issue #112 (rMQR uses a single Reed-Solomon block).
-   *
-   * ISO/IEC 23941 splits the larger rMQR symbols into several RS blocks. etiket
-   * emits one block for every version, so every symbol from roughly R9x139 upward
-   * is undecodable. Failing version indices at EC level M: 9, 14, 15, 19, 20, 21,
-   * 24, 25, 26, 28, 29, 30, 31; at EC level H additionally 4, 7, 8, 12, 13, 18,
-   * 22, 23, 27.
-   */
-  it.fails("decodes the larger versions (issue #112)", async () => {
+  // Regression guard for #112: these versions need several RS blocks, and
+  // every one of them was undecodable while the encoder emitted a single block.
+  // test/encoders-rmqr-roundtrip.test.ts sweeps all 32.
+  it("decodes the multi-block versions", async () => {
     for (const version of [9, 14, 20, 31]) {
       expect(await decodeMatrix(encodeRMQR("A1", { version }))).toBe("A1")
     }

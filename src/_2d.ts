@@ -153,7 +153,23 @@ export interface CodablockFSVGOptions extends MatrixSVGOptions {
 export function codablockf(text: string, options: CodablockFSVGOptions = {}): string {
   const { columns, ...svgOpts } = options
   const result = encodeCodablockF(text, { columns })
-  return renderMatrixSVG(result.matrix, { rowHeight: 8, ...svgOpts })
+  return renderMatrixSVG(result.matrix, {
+    rowHeight: 8,
+    ...svgOpts,
+    rowHeights: stackedRowHeights(result, svgOpts.rowHeight ?? 8),
+  })
+}
+
+/**
+ * Row heights for a stacked symbology: data rows at the requested height, the
+ * separator rows at the single module the specification gives them.
+ */
+function stackedRowHeights(
+  result: { matrix: boolean[][]; separatorRows: number[] },
+  rowHeight: number,
+): number[] {
+  const separators = new Set(result.separatorRows)
+  return result.matrix.map((_, index) => (separators.has(index) ? 1 : rowHeight))
 }
 
 /**
@@ -161,7 +177,11 @@ export function codablockf(text: string, options: CodablockFSVGOptions = {}): st
  */
 export function code16k(text: string, options: MatrixSVGOptions = {}): string {
   const result = encodeCode16K(text)
-  return renderMatrixSVG(result.matrix, { rowHeight: 8, ...options })
+  return renderMatrixSVG(result.matrix, {
+    rowHeight: 8,
+    ...options,
+    rowHeights: stackedRowHeights(result, options.rowHeight ?? 8),
+  })
 }
 
 /**

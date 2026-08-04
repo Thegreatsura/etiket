@@ -2,26 +2,26 @@
  * Codablock F modules verified against bwip-js (BWIPP).
  *
  * There is no JavaScript decoder for Codablock F, so the reference
- * implementation's module data is the oracle. BWIPP renders the full symbol — a
- * solid separator row above and below every data row — while etiket returns only
- * the data rows, so the BWIPP grid is trimmed to the same view before comparing.
- * There is no quiet zone in BWIPP's raw output for this symbology, and the row
- * width (11 * columns + 57) already matches.
+ * implementation's module data is the oracle. BWIPP renders the full symbol,
+ * separator rows included, and etiket now emits the same, so the whole grid is
+ * compared. There is no quiet zone in BWIPP's raw output for this symbology,
+ * and the row width (11 * columns + 57) already matches.
  */
 
 import { describe, expect, it } from "vitest"
 import { bwipMatrix } from "./_bwip"
 import { encodeCodablockF } from "../src/encoders/codablock-f"
 
-/** Data rows of a BWIPP Codablock F symbol, without the separator rows. */
+/** Every row of a BWIPP Codablock F symbol, separators included. */
 function bwipRows(text: string, columns: number): string[] {
-  const grid = bwipMatrix("codablockf", text, { columns })
-  const rows: string[] = []
-  // rows 0, 2, 4, ... are separators; data rows sit at the odd indices
-  for (let y = 1; y < grid.length; y += 2) {
-    rows.push(grid[y]!.map((m) => (m ? "1" : "0")).join(""))
-  }
-  return rows
+  return bwipMatrix("codablockf", text, { columns }).map((row) =>
+    row.map((m) => (m ? "1" : "0")).join(""),
+  )
+}
+
+/** The data rows only, for the assertions that are about the data. */
+function bwipDataRows(text: string, columns: number): string[] {
+  return bwipRows(text, columns).filter((_, y) => y % 2 === 1)
 }
 
 function etiketRows(text: string, columns: number): string[] {
@@ -58,10 +58,20 @@ describe("Codablock F modules match bwip-js", () => {
     })
   }
 
+  it("reports which rows are separators", () => {
+    const { matrix, rows, separatorRows } = encodeCodablockF("ABCDEF123456", { columns: 8 })
+    expect(matrix).toHaveLength(2 * rows + 1)
+    expect(separatorRows).toEqual(Array.from({ length: rows + 1 }, (_, i) => i * 2))
+    // the outermost separators are solid, the inner ones carry the row pattern
+    expect(matrix[0]!.every(Boolean)).toBe(true)
+    expect(matrix.at(-1)!.every(Boolean)).toBe(true)
+    expect(matrix[2]!.every(Boolean)).toBe(false)
+  })
+
   it("uses the same row count as bwip-js", () => {
     for (const columns of COLUMN_COUNTS) {
       for (const [, text] of SAMPLES) {
-        expect(encodeCodablockF(text, { columns }).rows).toBe(bwipRows(text, columns).length)
+        expect(encodeCodablockF(text, { columns }).rows).toBe(bwipDataRows(text, columns).length)
       }
     }
   })

@@ -41,6 +41,18 @@ export interface MatrixPNGOptions {
   moduleSize?: number
   /** Quiet zone in modules (default: 4) */
   margin?: number
+  /**
+   * Height of each matrix row as a multiple of the module size (default 1).
+   * Stacked symbologies such as Code 16K, Codablock F, PDF417 and MicroPDF417
+   * use taller rows.
+   */
+  rowHeight?: number
+  /**
+   * Per-row heights for symbols whose rows are not all the same height — Code
+   * 16K and Codablock F use it for their 1-module separator rows. Rows past
+   * the end of the array fall back to `rowHeight`.
+   */
+  rowHeights?: number[]
   /** Foreground color as hex string (default: "#000000") */
   color?: string
   /** Background color as hex string (default: "#ffffff") */

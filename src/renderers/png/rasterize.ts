@@ -133,13 +133,21 @@ export function renderMatrixRaster(
   matrix: boolean[][],
   options: MatrixPNGOptions = {},
 ): RasterData {
-  const { moduleSize = 10, margin = 4 } = options
+  const { moduleSize = 10, margin = 4, rowHeight = 1, rowHeights } = options
 
   const matRows = matrix.length
   const matCols = matRows > 0 ? matrix[0]!.length : 0
 
+  // Pixel height of each row; stacked symbologies mix tall data rows with
+  // 1-module separators
+  const heights = Array.from(
+    { length: matRows },
+    (_, r) => (rowHeights?.[r] ?? rowHeight) * moduleSize,
+  )
+  const matrixPixels = heights.reduce((sum, h) => sum + h, 0)
+
   const width = (matCols + margin * 2) * moduleSize
-  const height = (matRows + margin * 2) * moduleSize
+  const height = matrixPixels + margin * 2 * moduleSize
 
   const marginRow = new Uint8Array(width)
   const rows: Uint8Array[] = []
@@ -156,7 +164,7 @@ export function renderMatrixRaster(
         }
       }
     }
-    for (let y = 0; y < moduleSize; y++) rows.push(row)
+    for (let y = 0; y < heights[r]!; y++) rows.push(row)
   }
 
   for (let y = 0; y < marginPixels; y++) rows.push(marginRow)

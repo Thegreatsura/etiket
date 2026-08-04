@@ -99,9 +99,19 @@ const CHARS_PER_ROW = 5
 const ROW_MODULES = 70
 
 export interface Code16KResult {
+  /**
+   * The complete symbol, including the 1-module separator rows above, below
+   * and between the data rows.
+   */
   matrix: boolean[][]
+  /** Number of data rows (the matrix has `2 * rows + 1` rows in total) */
   rows: number
   cols: number
+  /**
+   * Indices in `matrix` of the separator rows, which render 1 module tall
+   * while the data rows render at the full row height.
+   */
+  separatorRows: number[]
 }
 
 /** Value of an ASCII code in character set A (0-95) */
@@ -399,7 +409,7 @@ export function encodeCode16K(text: string): Code16KResult {
   c2 = (c2 + c1 * (capacity + 2)) % 107
   symbol.push(c1, c2)
 
-  const matrix: boolean[][] = []
+  const dataRows: boolean[][] = []
   for (let r = 0; r < rows; r++) {
     // Row elements: start pattern, a 1-module bar, 5 symbol characters, stop
     // pattern. The extra bar makes the symbol characters start on a space.
@@ -419,8 +429,22 @@ export function encodeCode16K(text: string): Code16KResult {
       for (let k = 0; k < width; k++) modules.push(isBar)
       isBar = !isBar
     }
-    matrix.push(modules)
+    dataRows.push(modules)
   }
 
-  return { matrix, rows, cols: ROW_MODULES }
+  // A Code 16K symbol carries a solid 1-module separator above, below and
+  // between its data rows; without them the rows run together and the symbol
+  // cannot be read.
+  const separator = Array.from<boolean>({ length: ROW_MODULES }).fill(true)
+  const matrix: boolean[][] = []
+  const separatorRows: number[] = []
+  for (const row of dataRows) {
+    separatorRows.push(matrix.length)
+    matrix.push([...separator])
+    matrix.push(row)
+  }
+  separatorRows.push(matrix.length)
+  matrix.push([...separator])
+
+  return { matrix, rows, cols: ROW_MODULES, separatorRows }
 }

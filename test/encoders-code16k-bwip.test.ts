@@ -4,8 +4,8 @@
  * There is no JavaScript decoder for Code 16K, so the reference implementation's
  * module data is the oracle. BWIPP renders the full symbol — a 10 module quiet
  * zone, a solid separator above and below every data row, and a trailing white
- * column — while etiket returns only the 70 module data rows, so the BWIPP grid
- * is trimmed down to the same view before comparing.
+ * column — so only the quiet zone and the trailing column are trimmed; the
+ * separator rows are compared too, since etiket now emits them.
  */
 
 import { describe, expect, it } from "vitest"
@@ -15,19 +15,19 @@ import { encodeCode16K } from "../src/encoders/code16k"
 const QUIET_ZONE = 10
 const ROW_MODULES = 70
 
-/** Data rows of a BWIPP Code 16K symbol, without quiet zone or separators */
+/** Every row of a BWIPP Code 16K symbol, without the quiet zone */
 function bwipRows(text: string): string[] {
-  const grid = bwipMatrix("code16k", text)
-  const rows: string[] = []
-  // rows 0, 2, 4, ... are separators; data rows sit at the odd indices
-  for (let y = 1; y < grid.length; y += 2) {
-    rows.push(
-      grid[y]!.slice(QUIET_ZONE, QUIET_ZONE + ROW_MODULES)
-        .map((m) => (m ? "1" : "0"))
-        .join(""),
-    )
-  }
-  return rows
+  return bwipMatrix("code16k", text).map((row) =>
+    row
+      .slice(QUIET_ZONE, QUIET_ZONE + ROW_MODULES)
+      .map((m) => (m ? "1" : "0"))
+      .join(""),
+  )
+}
+
+/** The data rows only, for the assertions that are about the data */
+function bwipDataRows(text: string): string[] {
+  return bwipRows(text).filter((_, y) => y % 2 === 1)
 }
 
 function etiketRows(text: string): string[] {
@@ -54,7 +54,19 @@ describe("Code 16K modules match bwip-js", () => {
 
   it("uses the same symbol size as bwip-js", () => {
     for (const [, text] of SAMPLES) {
-      expect(encodeCode16K(text).rows).toBe(bwipRows(text).length)
+      expect(encodeCode16K(text).rows).toBe(bwipDataRows(text).length)
+    }
+  })
+
+  it("reports which rows are separators", () => {
+    for (const [, text] of SAMPLES) {
+      const { matrix, rows, separatorRows } = encodeCode16K(text)
+      expect(matrix).toHaveLength(2 * rows + 1)
+      expect(separatorRows).toEqual(Array.from({ length: rows + 1 }, (_, i) => i * 2))
+      // every separator is a solid dark row
+      for (const index of separatorRows) {
+        expect(matrix[index]!.every(Boolean), `row ${index}`).toBe(true)
+      }
     }
   })
 })

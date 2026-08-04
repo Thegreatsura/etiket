@@ -6,12 +6,15 @@
  * - 32 symbol sizes from R7x43 to R17x139
  * - Single finder pattern (top-left) + alignment patterns
  * - EC levels M and H only
- * - Numeric, alphanumeric, byte, kanji modes
+ * - Per-version Reed-Solomon blocking with interleaving (ISO/IEC 23941 Table 13)
+ * - Numeric, alphanumeric and byte modes, with optional ECI
+ * - Kanji mode is not implemented: it needs a real Unicode -> Shift-JIS table,
+ *   which `qr/mode.ts` does not have (its `unicodeToShiftJIS` is approximate).
  */
 
 import { InvalidInputError, CapacityError } from "../errors"
 import { encodeNumericData, encodeAlphanumericData, encodeByteData, pushBits } from "./qr/mode"
-import { generateECCodewords } from "./qr/reed-solomon"
+import { addErrorCorrection } from "./qr/reed-solomon"
 
 // rMQR symbol sizes from Zint/ISO 23941: [rows, cols, dataCW_M, dataCW_H, ecCW_M, ecCW_H]
 // prettier-ignore
@@ -24,11 +27,47 @@ const RMQR_SIZES: [number, number, number, number, number, number][] = [
   [17,43,39,21,22,40],[17,59,56,28,32,60],[17,77,78,38,44,84],[17,99,100,56,60,104],[17,139,152,76,80,156],
 ];
 
+// Reed-Solomon block counts per version index (ISO/IEC 23941 Table 13).
+// Each entry: [M group1 blocks, M group2 blocks, H group1 blocks, H group2 blocks].
+// Group 2 blocks carry exactly one more data codeword than group 1 blocks;
+// every block of a symbol carries the same number of EC codewords.
+// prettier-ignore
+const RMQR_BLOCKS: [number, number, number, number][] = [
+  [1,0,1,0],[1,0,1,0],[1,0,1,0],[1,0,1,0],[1,0,2,0],           // R7x43 .. R7x139
+  [1,0,1,0],[1,0,1,0],[1,0,1,1],[1,0,2,0],[1,1,3,0],           // R9x43 .. R9x139
+  [1,0,1,0],[1,0,1,0],[1,0,1,1],[1,0,1,1],[1,1,1,1],[2,0,3,0], // R11x27 .. R11x139
+  [1,0,1,0],[1,0,1,0],[1,0,2,0],[1,1,1,1],[1,1,1,2],[2,1,2,2], // R13x27 .. R13x139
+  [1,0,1,1],[1,0,2,0],[1,1,2,1],[2,0,4,0],[2,1,1,4],           // R15x43 .. R15x139
+  [1,0,1,1],[2,0,2,0],[2,0,1,2],[2,1,4,0],[4,0,2,4],           // R17x43 .. R17x139
+];
+
 // rMQR mode indicators (3 bits each, per ISO/IEC 23941)
 const RMQR_MODE_NUMERIC = 0b001
 const RMQR_MODE_ALPHANUMERIC = 0b010
 const RMQR_MODE_BYTE = 0b011
 // const RMQR_MODE_KANJI = 0b100;
+const RMQR_MODE_ECI = 0b111
+
+/**
+ * Push an ECI header (mode indicator + designator) onto a bit stream.
+ * The designator uses the variable-length form of ISO/IEC 23941 / 18004:
+ * 8 bits for 0-127, 16 bits for 128-16383, 24 bits for 16384-999999.
+ */
+function pushECIHeader(bits: number[], eci: number): void {
+  if (!Number.isInteger(eci) || eci < 0 || eci > 999_999) {
+    throw new InvalidInputError(`rMQR ECI designator must be an integer 0-999999, got ${eci}`)
+  }
+  pushBits(bits, RMQR_MODE_ECI, 3)
+  if (eci < 128) {
+    pushBits(bits, eci, 8)
+  } else if (eci < 16_384) {
+    pushBits(bits, 0b10, 2)
+    pushBits(bits, eci, 14)
+  } else {
+    pushBits(bits, 0b110, 3)
+    pushBits(bits, eci, 21)
+  }
+}
 
 /**
  * Character count indicator bit lengths per version index (ISO/IEC 23941 Table 3)
@@ -97,6 +136,11 @@ const RMQR_FORMAT_RIGHT: number[] = [
 export interface RMQROptions {
   ecLevel?: "M" | "H"
   version?: number // index into RMQR_SIZES (0-31)
+  /**
+   * ECI designator (0-999999) prefixed to the data segment, declaring the
+   * character set of the payload. e.g. 3 = ISO-8859-1, 26 = UTF-8.
+   */
+  eci?: number
 }
 
 /**
@@ -108,10 +152,15 @@ function encodeRMQRData(
   text: string,
   versionIdx: number,
   mode: "numeric" | "alphanumeric" | "byte",
+  eci?: number,
 ): number[] {
   const cci = RMQR_CCI_LENGTHS[versionIdx]!
   const bits: number[] = []
   const data = new TextEncoder().encode(text)
+
+  if (eci !== undefined) {
+    pushECIHeader(bits, eci)
+  }
 
   if (mode === "numeric") {
     pushBits(bits, RMQR_MODE_NUMERIC, 3)
@@ -156,11 +205,11 @@ export function encodeRMQR(text: string, options: RMQROptions = {}): boolean[][]
   if (options.version !== undefined) {
     // User requested a specific version
     sizeIdx = options.version
-    bits = encodeRMQRData(text, sizeIdx, mode)
     const size = RMQR_SIZES[sizeIdx]
     if (!size) {
       throw new CapacityError("Invalid rMQR version index")
     }
+    bits = encodeRMQRData(text, sizeIdx, mode, options.eci)
     const dataCW = ecLevel === "M" ? size[2] : size[3]
     if (bits.length > dataCW * 8) {
       throw new CapacityError("Data too long for requested rMQR symbol size")
@@ -169,7 +218,7 @@ export function encodeRMQR(text: string, options: RMQROptions = {}): boolean[][]
     for (let i = 0; i < RMQR_SIZES.length; i++) {
       const size = RMQR_SIZES[i]!
       const dataCW = ecLevel === "M" ? size[2] : size[3]
-      const candidateBits = encodeRMQRData(text, i, mode)
+      const candidateBits = encodeRMQRData(text, i, mode, options.eci)
       if (candidateBits.length <= dataCW * 8) {
         sizeIdx = i
         bits = candidateBits
@@ -207,9 +256,23 @@ export function encodeRMQR(text: string, options: RMQROptions = {}): boolean[][]
     dataBytes.push(byte)
   }
 
-  // EC
-  const ecBytes = generateECCodewords(dataBytes, ecCW)
-  const allBytes = [...dataBytes, ...ecBytes]
+  // EC — ISO/IEC 23941 splits the larger symbols into several RS blocks whose
+  // data and EC codewords are then interleaved (identical scheme to QR Code).
+  const blockSpec = RMQR_BLOCKS[sizeIdx]!
+  const group1Blocks = ecLevel === "M" ? blockSpec[0] : blockSpec[2]
+  const group2Blocks = ecLevel === "M" ? blockSpec[1] : blockSpec[3]
+  const totalBlocks = group1Blocks + group2Blocks
+  const group1DataCW = Math.floor(dataCW / totalBlocks)
+  const group2DataCW = group2Blocks > 0 ? group1DataCW + 1 : 0
+  const ecPerBlock = ecCW / totalBlocks
+  const allBytes = addErrorCorrection(
+    dataBytes,
+    ecPerBlock,
+    group1Blocks,
+    group1DataCW,
+    group2Blocks,
+    group2DataCW,
+  )
 
   // Build matrix (null = data area, boolean = function pattern)
   const matrix: (boolean | null)[][] = Array.from({ length: rows }, () =>
