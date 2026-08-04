@@ -3,6 +3,8 @@
  * Handles both PNG-embedded (modern) and BMP-based (legacy) ICO entries
  */
 
+import { InvalidInputError } from "../../errors"
+
 import { encodeTrueColorPNG } from "../png/png-encoder"
 
 const PNG_SIGNATURE = 0x89504e47
@@ -27,7 +29,7 @@ export function icoToPngDataURI(icoData: Uint8Array): string {
   const count = view.getUint16(4, true)
 
   if (reserved !== 0 || (type !== 1 && type !== 2) || count === 0) {
-    throw new Error("Invalid ICO file")
+    throw new InvalidInputError("Invalid ICO file")
   }
 
   // Read directory entries and pick the largest
@@ -72,7 +74,7 @@ function dibToPngDataURI(dib: Uint8Array, entryW: number, entryH: number): strin
   const compression = view.getUint32(16, true)
 
   if (compression !== 0 && compression !== 3) {
-    throw new Error(`Unsupported BMP compression: ${compression}`)
+    throw new InvalidInputError(`Unsupported BMP compression: ${compression}`)
   }
 
   const rgba = new Uint8Array(width * height * 4)
@@ -84,7 +86,7 @@ function dibToPngDataURI(dib: Uint8Array, entryW: number, entryH: number): strin
   } else if (bpp <= 8) {
     decodeIndexed(dib, headerSize, width, height, bpp, rgba)
   } else {
-    throw new Error(`Unsupported BMP bit depth: ${bpp}`)
+    throw new InvalidInputError(`Unsupported BMP bit depth: ${bpp}`)
   }
 
   // Apply AND mask if present (transparency for < 32bpp)

@@ -1,8 +1,12 @@
 /**
- * 1D Barcode round-trip tests — encode with etiket, decode with zbar.wasm
- * Verifies that generated barcodes are actually scannable
+ * Structural checks for the 1D symbologies that have no decoder here.
  *
- * Note: Uses a PBM image intermediate since zbar.wasm needs pixel data
+ * These assert the shape of the element array — bar counts, widths, start and
+ * stop patterns — and nothing more. Real verification lives elsewhere:
+ * test/1d-roundtrip.test.ts decodes with zxing-wasm, and
+ * test/bwip-compare.test.ts compares against the reference implementation for
+ * the formats no decoder covers. This file is the cheap first line, and it does
+ * not claim to be anything else.
  */
 
 import { describe, expect, it } from "vitest"

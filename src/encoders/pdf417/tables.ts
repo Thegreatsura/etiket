@@ -1,3 +1,5 @@
+import { InvalidInputError } from "../../errors"
+
 /**
  * PDF417 codeword pattern tables and text compaction mappings
  * Based on ISO/IEC 15438
@@ -12,7 +14,7 @@
 export const START_PATTERN: readonly number[] = [8, 1, 1, 1, 1, 1, 1, 3]
 
 /** Stop pattern: 18 modules (includes terminating bar) — bar,space,bar,space,bar,space,bar,space,bar */
-export const STOP_PATTERN: readonly number[] = [7, 1, 1, 1, 1, 1, 1, 2, 1]
+export const STOP_PATTERN: readonly number[] = [7, 1, 1, 3, 1, 1, 1, 2, 1]
 
 /**
  * PDF417 codeword-to-module-pattern tables from ISO/IEC 15438:2001(E) Annex A.
@@ -248,7 +250,7 @@ export function getCodewordPattern(codeword: number, cluster: number): number[] 
   const clusterIndex = cluster / 3
   const table = CLUSTERS[clusterIndex]!
   if (codeword < 0 || codeword >= table.length) {
-    throw new Error(
+    throw new InvalidInputError(
       "Codeword " +
         codeword +
         " out of range for cluster " +
@@ -363,4 +365,7 @@ export const MODE_LATCH = {
   BYTE_COMPACTION: 901,
   NUMERIC_COMPACTION: 902,
   BYTE_COMPACTION_6: 924, // byte compaction, groups of 6
+  ECI_USER: 925, // ECI 810900-811799, one codeword follows
+  ECI_GENERAL: 926, // ECI 900-810899, two codewords follow
+  ECI_CHARSET: 927, // ECI 0-899, one codeword follows
 } as const

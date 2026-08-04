@@ -7,6 +7,7 @@ import {
   encodeGS1DataBarOmni,
   encodeGS1DataBarLimited,
   encodeGS1DataBarExpanded,
+  encodeGS1DataBarTruncated,
 } from "./encoders/gs1-databar"
 import { encodeEAN13, encodeEAN8 } from "./encoders/ean"
 import { encodeCode39, encodeCode39Extended } from "./encoders/code39"
@@ -100,8 +101,10 @@ export function encodeBars(text: string, options: BarcodeEncodingOptions = {}): 
       return encodeGS1DataBarLimited(text)
     case "gs1-databar-expanded":
       return encodeGS1DataBarExpanded(text)
+    case "gs1-databar-truncated":
+      return encodeGS1DataBarTruncated(text)
     default:
-      throw new Error(`Unsupported barcode type: ${type}`)
+      throw new InvalidInputError(`Unsupported barcode type: ${type}`)
   }
 }
 

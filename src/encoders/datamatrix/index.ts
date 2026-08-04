@@ -7,7 +7,9 @@
 
 import { InvalidInputError, CapacityError } from "../../errors"
 import { encodeAuto, padCodewords } from "./encoder"
-import { selectSymbolSize } from "./tables"
+import { maxCapacity, selectSymbolSize } from "./tables"
+import type { DataMatrixSizeOptions } from "./tables"
+import type { DataMatrixEncodeOptions } from "./encoder"
 import { generateInterleavedEC } from "./reed-solomon"
 import { placeModules } from "./placement"
 import { parseAIString, isVariableLength } from "../gs1-128"
@@ -17,28 +19,36 @@ import { parseAIString, isVariableLength } from "../gs1-128"
  * Returns a 2D boolean array (true = dark module).
  *
  * @param text - The text to encode (ASCII characters 0-255)
+ * @param options - Symbol shape / size selection (square by default)
  * @returns 2D boolean matrix representing the Data Matrix symbol
  *
  * @example
  * ```ts
  * const matrix = encodeDataMatrix('Hello')
  * // matrix[row][col] === true means dark module
+ *
+ * // Rectangular, including the ISO 21471 DMRE sizes
+ * const wide = encodeDataMatrix('Hello', { shape: 'rectangle', dmre: true })
+ *
+ * // Exact size
+ * const fixed = encodeDataMatrix('Hello', { symbolSize: '26x64' })
  * ```
  */
-export function encodeDataMatrix(text: string): boolean[][] {
+export function encodeDataMatrix(
+  text: string,
+  options: DataMatrixSizeOptions & DataMatrixEncodeOptions = {},
+): boolean[][] {
   if (text.length === 0) {
     throw new InvalidInputError("Data Matrix input must not be empty")
   }
 
   // Step 1: Encode text to data codewords (auto-select best mode)
-  const dataCodewords = encodeAuto(text)
+  const dataCodewords = encodeAuto(text, { eci: options.eci })
 
   // Step 2: Select the smallest symbol size that fits the data
-  const symbol = selectSymbolSize(dataCodewords.length)
+  const symbol = selectSymbolSize(dataCodewords.length, options)
   if (!symbol) {
-    throw new CapacityError(
-      `Data too long for Data Matrix: ${dataCodewords.length} codewords needed, maximum is 1558`,
-    )
+    throw new CapacityError(capacityMessage("Data Matrix", dataCodewords.length, options))
   }
 
   // Step 3: Pad data codewords to fill symbol capacity
@@ -63,9 +73,13 @@ export function encodeDataMatrix(text: string): boolean[][] {
  * Accepts parenthesized AI format: "(01)12345678901234(21)SERIAL"
  *
  * @param text - GS1 AI string in parenthesized format
+ * @param options - Symbol shape / size selection (square by default)
  * @returns 2D boolean matrix
  */
-export function encodeGS1DataMatrix(text: string): boolean[][] {
+export function encodeGS1DataMatrix(
+  text: string,
+  options: DataMatrixSizeOptions = {},
+): boolean[][] {
   if (text.length === 0) {
     throw new InvalidInputError("GS1 DataMatrix input must not be empty")
   }
@@ -92,11 +106,9 @@ export function encodeGS1DataMatrix(text: string): boolean[][] {
   }
 
   // Select symbol, pad, EC, place — same as standard DataMatrix
-  const symbol = selectSymbolSize(codewords.length)
+  const symbol = selectSymbolSize(codewords.length, options)
   if (!symbol) {
-    throw new CapacityError(
-      `Data too long for GS1 DataMatrix: ${codewords.length} codewords needed`,
-    )
+    throw new CapacityError(capacityMessage("GS1 DataMatrix", codewords.length, options))
   }
 
   const paddedData = padCodewords(codewords, symbol.totalDataCodewords)
@@ -107,4 +119,18 @@ export function encodeGS1DataMatrix(text: string): boolean[][] {
   )
   const allCodewords = [...paddedData, ...ecCodewords]
   return placeModules(allCodewords, symbol)
+}
+
+/** Build a capacity error message that names the limit actually in force */
+function capacityMessage(label: string, needed: number, options: DataMatrixSizeOptions): string {
+  if (options.symbolSize !== undefined) {
+    const size =
+      typeof options.symbolSize === "string"
+        ? options.symbolSize
+        : `${options.symbolSize.rows}x${options.symbolSize.cols}`
+    return `Data too long for ${label} symbol ${size}: ${needed} codewords needed`
+  }
+  const shape = options.shape ?? "square"
+  const limit = maxCapacity(options)
+  return `Data too long for ${label}: ${needed} codewords needed, maximum is ${limit} for ${shape} symbols${options.dmre ? " (DMRE enabled)" : ""}`
 }

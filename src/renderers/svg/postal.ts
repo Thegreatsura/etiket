@@ -22,7 +22,14 @@ export interface PostalSVGOptions extends SVGAccessibilityOptions {
   /** Total symbol height in units (full-bar height). Default 40. */
   height?: number
   /** Width of a single bar in units. Default 2. */
+  /**
+   * Width of one bar in units.
+   *
+   * @deprecated Prefer `moduleSize`, which every renderer accepts.
+   */
   barWidth?: number
+  /** Width of one bar in units — the name every renderer accepts */
+  moduleSize?: number
   /** Centre-to-centre distance between bars in units. Default barWidth * 2. */
   pitch?: number
   /** Bar color. Default "#000". */
@@ -108,7 +115,7 @@ export function renderPostalSVG(
 ): string {
   const {
     height = 40,
-    barWidth = 2,
+    barWidth = options.moduleSize ?? 2,
     color = "#000",
     background = "#fff",
     unit = "px",

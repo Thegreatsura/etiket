@@ -228,7 +228,9 @@ describe("Codablock-F charset transitions", () => {
 
   it("reports matrix dimensions consistent with the matrix", () => {
     const result = encodeCodablockF("CODABLOCK")
-    expect(result.matrix).toHaveLength(result.rows)
+    // The matrix carries a separator above, below and between the data rows
+    expect(result.matrix).toHaveLength(2 * result.rows + 1)
+    expect(result.separatorRows).toHaveLength(result.rows + 1)
     expect(result.matrix[0]).toHaveLength(result.cols)
   })
 })
@@ -274,8 +276,16 @@ describe("GS1 DataBar Expanded", () => {
     expect(lower.length).toBeGreaterThan(0)
   })
 
-  it("encodes other characters as 8-bit ISO 646 values", () => {
-    expect(encodeGS1DataBarExpanded("(10)A#B%C").length).toBeGreaterThan(0)
+  it("encodes punctuation that has an 8-bit ISO 646 value", () => {
+    // '%' '&' ':' '?' '_' and space are in the ISO 646 subset of Table 13
+    expect(encodeGS1DataBarExpanded("(10)A%B&C").length).toBeGreaterThan(0)
+    expect(encodeGS1DataBarExpanded("(10)A:B?C_D E").length).toBeGreaterThan(0)
+  })
+
+  it("rejects characters outside the ISO 646 subset", () => {
+    // '#' and '$' have no encoding in GS1 DataBar Expanded
+    expect(() => encodeGS1DataBarExpanded("(10)A#B")).toThrow(/not encodable/)
+    expect(() => encodeGS1DataBarExpanded("(10)A$B")).toThrow(/not encodable/)
   })
 
   it("latches back to numeric for digit pairs after letters", () => {

@@ -8,6 +8,7 @@
  */
 
 export { barcode, barcodeDataURI, barcodeBase64, encodeBars } from "./_barcode"
+export { BARCODE_TYPES } from "./_types"
 export type { BarcodeType, BarcodeOptions, BarcodeEncodingOptions } from "./_types"
 export type { BarcodeSVGOptions } from "./renderers/svg/types"
 
@@ -32,5 +33,48 @@ export {
   encodeGS1DataBarOmni,
   encodeGS1DataBarLimited,
   encodeGS1DataBarExpanded,
+  encodeGS1DataBarTruncated,
+  encodeGS1DataBarStacked,
+  encodeGS1DataBarStackedOmni,
+  encodeGS1DataBarExpandedStacked,
 } from "./encoders/gs1-databar"
+export { gs1databarStacked, gs1databarStackedOmni, gs1databarExpandedStacked } from "./_2d"
 export { renderBarcodeSVG } from "./renderers/svg/barcode"
+export { svgToDataURI, svgToBase64 } from "./renderers/data-uri"
+
+// Industry encoders that build on the linear symbologies
+export { encodeGS1Composite, encodeGS1CompositeSymbol } from "./encoders/gs1-composite"
+export type {
+  CompositeType,
+  CompositeLinearType,
+  GS1CompositeOptions,
+  GS1CompositeResult,
+  GS1CompositeSymbolResult,
+} from "./encoders/gs1-composite"
+export { encodeHIBCPrimary, encodeHIBCSecondary, encodeHIBCConcatenated } from "./encoders/hibc"
+export {
+  encodeISBT128DIN,
+  encodeISBT128Component,
+  encodeISBT128Expiry,
+  encodeISBT128BloodGroup,
+  iso7064Mod37_2,
+} from "./encoders/isbt128"
+
+// PNG output
+export { barcodePNG, barcodePNGDataURI } from "./_png"
+export type { BarcodePNGOptions } from "./renderers/png/types"
+
+// Validation and errors, so a barcode-only consumer can gate input and catch
+// failures without importing the full entry
+export {
+  validateBarcode,
+  isValidInput,
+  validateBarcodeInput,
+  calculateEANCheckDigit,
+  verifyEANCheckDigit,
+} from "./validators/barcode"
+export { EtiketError, InvalidInputError, CapacityError, CheckDigitError } from "./errors"
+
+// Batch generation and label sheets
+export { barcodes, barcodeSheet } from "./_batch"
+export type { BatchOptions, BarcodeSheetOptions, SheetOptions } from "./_batch"

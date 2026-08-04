@@ -11,7 +11,7 @@ import { escapeAttr, escapeXml } from "./utils"
 export function renderBarcodeSVG(bars: number[], options: BarcodeSVGOptions = {}): string {
   const {
     height = 80,
-    barWidth = 2,
+    barWidth = options.moduleSize ?? 2,
     barGap = 0,
     color = "#000",
     background = "#fff",

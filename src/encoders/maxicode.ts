@@ -9,7 +9,7 @@
  * - Reed-Solomon error correction over GF(64)
  */
 
-import { InvalidInputError } from "../errors"
+import { CapacityError, InvalidInputError } from "../errors"
 
 const ROWS = 33
 const COLS = 30
@@ -84,91 +84,311 @@ function maxicodeRS(data: number[], ecCount: number): number[] {
 // MaxiCode character encoding (Code Sets A-E per ISO/IEC 16023)
 // ---------------------------------------------------------------------------
 
-// Code set assignment for each ASCII byte (0-255)
-// 0 = available in multiple sets, 1 = Set A, 2 = Set B, 3 = Set C, 4 = Set D, 5 = Set E
-// prettier-ignore
-const MAXICODE_SET: number[] = [
-  5,5,5,5,5,5,5,5,5,5,5,5,5,0,5,5,5,5,5,5,
-  5,5,5,5,5,5,5,5,0,0,0,5,0,2,1,1,1,1,1,1,
-  1,1,1,1,0,1,0,0,1,1,1,1,1,1,1,1,1,1,0,2,
-  2,2,2,2,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,3,3,4,4,
-  4,4,4,4,4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,5,
-  5,4,5,5,5,5,5,5,4,5,3,4,3,5,5,4,4,3,3,3,
-  4,3,5,4,4,3,3,4,3,3,3,4,3,3,3,3,3,3,3,3,
-  3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
-  3,3,3,3,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,
-  4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,
-];
+/**
+ * Non-character symbol values. They occupy the same table as byte values, so
+ * they are given negative keys to keep the two apart.
+ */
+const ECI = -1 // Extended Channel Interpretation
+const PAD = -2 // Padding
+const NS = -3 // Numeric Sequence (9 digits in 6 codewords)
+const LA = -4 // Latch to code set A
+const LB = -5 // Latch to code set B
+const SA = -6 // Shift one character from code set A
+const SB = -7 // Shift one character from code set B
+const SC = -8 // Shift one character from code set C
+const SD = -9 // Shift one character from code set D
+const SE = -10 // Shift one character from code set E
+const SA2 = -11 // Shift two characters from code set A
+const SA3 = -12 // Shift three characters from code set A
+const LKC = -13 // Lock (latch) into code set C
+const LKD = -14 // Lock (latch) into code set D
+const LKE = -15 // Lock (latch) into code set E
+const PD2 = -16 // Two-character pad
+const PD3 = -17 // Three-character pad
 
-// Symbol character value for each ASCII byte in its assigned code set
-// prettier-ignore
-const MAXICODE_SYMBOL_CHAR: number[] = [
-  0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,
-  20,21,22,23,24,25,26,30,28,29,30,35,32,53,34,35,36,37,38,39,
-  40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,37,
-  38,39,40,41,52,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,
-  16,17,18,19,20,21,22,23,24,25,26,42,43,44,45,46,0,1,2,3,
-  4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,
-  24,25,26,32,54,34,35,36,48,49,50,51,52,53,54,55,56,57,47,48,
-  49,50,51,52,53,54,55,56,57,48,49,50,51,52,53,54,55,56,57,36,
-  37,37,38,39,40,41,42,43,38,44,37,39,38,45,46,40,41,39,40,41,
-  42,42,47,43,44,43,44,45,45,46,47,46,0,1,2,3,4,5,6,7,
-  8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,32,
-  33,34,35,36,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,
-  16,17,18,19,20,21,22,23,24,25,26,32,33,34,35,36,
-];
-
-// Control codes
-const CTRL_LATCH_B = 63 // Latch to Set B (from Set A)
-const CTRL_LATCH_A = 58 // Latch to Set A (from Set B)
+const SET_A = 0
+const SET_B = 1
+const SET_C = 2
+const SET_D = 3
+const SET_E = 4
 
 /**
- * Encode text using MaxiCode character sets with automatic set switching.
- * Starts in Code Set A. Uses latch codes when needed.
+ * ISO/IEC 16023 table 2: symbol value -> represented byte (or special code)
+ * for each of the five code sets. Row index is the symbol value 0-63.
  */
-function encodeMaxiCodeText(text: string): number[] {
+// prettier-ignore
+const CHAR_MAPS: number[][] = [
+  //  A    B    C    D    E
+  [ 13,  96, 192, 224,   0], // 0
+  [ 65,  97, 193, 225,   1], // 1
+  [ 66,  98, 194, 226,   2], // 2
+  [ 67,  99, 195, 227,   3], // 3
+  [ 68, 100, 196, 228,   4], // 4
+  [ 69, 101, 197, 229,   5], // 5
+  [ 70, 102, 198, 230,   6], // 6
+  [ 71, 103, 199, 231,   7], // 7
+  [ 72, 104, 200, 232,   8], // 8
+  [ 73, 105, 201, 233,   9], // 9
+  [ 74, 106, 202, 234,  10], // 10
+  [ 75, 107, 203, 235,  11], // 11
+  [ 76, 108, 204, 236,  12], // 12
+  [ 77, 109, 205, 237,  13], // 13
+  [ 78, 110, 206, 238,  14], // 14
+  [ 79, 111, 207, 239,  15], // 15
+  [ 80, 112, 208, 240,  16], // 16
+  [ 81, 113, 209, 241,  17], // 17
+  [ 82, 114, 210, 242,  18], // 18
+  [ 83, 115, 211, 243,  19], // 19
+  [ 84, 116, 212, 244,  20], // 20
+  [ 85, 117, 213, 245,  21], // 21
+  [ 86, 118, 214, 246,  22], // 22
+  [ 87, 119, 215, 247,  23], // 23
+  [ 88, 120, 216, 248,  24], // 24
+  [ 89, 121, 217, 249,  25], // 25
+  [ 90, 122, 218, 250,  26], // 26
+  [ECI, ECI, ECI, ECI, ECI], // 27
+  [ 28,  28,  28,  28, PAD], // 28
+  [ 29,  29,  29,  29, PD2], // 29
+  [ 30,  30,  30,  30,  27], // 30
+  [ NS,  NS,  NS,  NS,  NS], // 31
+  [ 32, 123, 219, 251,  28], // 32
+  [PAD, PAD, 220, 252,  29], // 33
+  [ 34, 125, 221, 253,  30], // 34
+  [ 35, 126, 222, 254,  31], // 35
+  [ 36, 127, 223, 255, 159], // 36
+  [ 37,  59, 170, 161, 160], // 37
+  [ 38,  60, 172, 168, 162], // 38
+  [ 39,  61, 177, 171, 163], // 39
+  [ 40,  62, 178, 175, 164], // 40
+  [ 41,  63, 179, 176, 165], // 41
+  [ 42,  91, 181, 180, 166], // 42
+  [ 43,  92, 185, 183, 167], // 43
+  [ 44,  93, 186, 184, 169], // 44
+  [ 45,  94, 188, 187, 173], // 45
+  [ 46,  95, 189, 191, 174], // 46
+  [ 47,  32, 190, 138, 182], // 47
+  [ 48,  44, 128, 139, 149], // 48
+  [ 49,  46, 129, 140, 150], // 49
+  [ 50,  47, 130, 141, 151], // 50
+  [ 51,  58, 131, 142, 152], // 51
+  [ 52,  64, 132, 143, 153], // 52
+  [ 53,  33, 133, 144, 154], // 53
+  [ 54, 124, 134, 145, 155], // 54
+  [ 55, PD2, 135, 146, 156], // 55
+  [ 56, SA2, 136, 147, 157], // 56
+  [ 57, SA3, 137, 148, 158], // 57
+  [ 58, PD3,  LA,  LA,  LA], // 58
+  [ SB,  SA,  32,  32,  32], // 59
+  [ SC,  SC, LKC,  SC,  SC], // 60
+  [ SD,  SD,  SD, LKD,  SD], // 61
+  [ SE,  SE,  SE,  SE, LKE], // 62
+  [ LB,  LA,  LB,  LB,  LB], // 63
+]
+
+/**
+ * Inverse of {@link CHAR_MAPS}: byte (or special code) -> symbol value, one map
+ * per code set. Later rows win, matching the reference implementation.
+ */
+const CODE_SETS: Map<number, number>[] = Array.from({ length: 5 }, () => new Map<number, number>())
+for (const [value, row] of CHAR_MAPS.entries()) {
+  for (let set = 0; set < 5; set++) {
+    CODE_SETS[set]!.set(row[set]!, value)
+  }
+}
+
+/** Padding symbol value per code set; -1 for the sets that have no pad code. */
+const PAD_CODES = CODE_SETS.map((set) => set.get(PAD) ?? -1)
+
+/** Shift / lock symbols used to reach code sets C, D and E. */
+const SHIFT_CODES = [SC, SD, SE]
+const LOCK_CODES = [LKC, LKD, LKE]
+
+/** Human-readable description of a code point, for error messages. */
+function describeChar(codePoint: number): string {
+  const hex = codePoint.toString(16).toUpperCase().padStart(4, "0")
+  return `"${String.fromCodePoint(codePoint)}" (U+${hex})`
+}
+
+/** Symbol value for `key` in `set`; the caller has already proven it exists. */
+function symbolOf(set: number, key: number): number {
+  return CODE_SETS[set]!.get(key)!
+}
+
+/** Result of encoding the message body. */
+interface EncodedMessage {
+  /** Message codewords, excluding padding. */
+  codewords: number[]
+  /** Code set the encoder ended in — determines the pad codeword. */
+  set: number
+}
+
+/**
+ * Encode text into MaxiCode message codewords.
+ *
+ * Starts in Code Set A and switches between all five code sets using the
+ * latch, lock and shift codewords of ISO/IEC 16023. Runs of nine or more
+ * digits are compacted with the Numeric Sequence (NS) codeword.
+ *
+ * Every byte 0x00-0xFF is representable in exactly one of the five code sets,
+ * so only code points above U+00FF are rejected — MaxiCode's default character
+ * set is ISO/IEC 8859-1 and this encoder does not emit ECI designators.
+ *
+ * @throws {InvalidInputError} for characters outside ISO/IEC 8859-1
+ */
+function encodeMaxiCodeText(text: string): EncodedMessage {
+  const chars: number[] = []
+  for (const ch of text) {
+    const cp = ch.codePointAt(0)!
+    if (cp > 0xff) {
+      throw new InvalidInputError(
+        `MaxiCode: character ${describeChar(cp)} cannot be encoded — ` +
+          `MaxiCode supports ISO/IEC 8859-1 (Latin-1) characters only`,
+      )
+    }
+    chars.push(cp)
+  }
+
+  const length = chars.length
+
+  // Number of consecutive digits starting at each position
+  const digitRun = Array.from<number>({ length: length + 1 }).fill(0)
+  for (let i = length - 1; i >= 0; i--) {
+    const c = chars[i]!
+    digitRun[i] = c >= 48 && c <= 57 ? digitRun[i + 1]! + 1 : 0
+  }
+
+  /** Count leading characters at `from` (max 4) that `set` can represent. */
+  const prefixInSet = (set: number, from: number): number => {
+    const map = CODE_SETS[set]!
+    let n = 0
+    while (n < 4 && from + n < length && map.has(chars[from + n]!)) n++
+    return n
+  }
+
   const codewords: number[] = []
-  let currentSet = 1 // Start in Code Set A
+  let set = SET_A
+  let i = 0
 
-  for (let i = 0; i < text.length; i++) {
-    const code = text.charCodeAt(i)
-    if (code > 255) continue // Skip non-latin
+  while (i < length) {
+    // Numeric Sequence: nine digits in six codewords
+    if (digitRun[i]! >= 9) {
+      let value = 0
+      for (let k = 0; k < 9; k++) value = value * 10 + (chars[i + k]! - 48)
+      codewords.push(
+        symbolOf(set, NS),
+        (value >> 24) & 0x3f,
+        (value >> 18) & 0x3f,
+        (value >> 12) & 0x3f,
+        (value >> 6) & 0x3f,
+        value & 0x3f,
+      )
+      i += 9
+      continue
+    }
 
-    const charSet = MAXICODE_SET[code]!
-    const symbolVal = MAXICODE_SYMBOL_CHAR[code]!
+    const char = chars[i]!
 
-    if (charSet === 0 || charSet === currentSet) {
-      // Character is in current set or available in multiple sets
-      codewords.push(symbolVal)
-    } else if (charSet === 1 && currentSet === 2) {
-      // Need to switch from B to A
-      codewords.push(CTRL_LATCH_A)
-      codewords.push(symbolVal)
-      currentSet = 1
-    } else if (charSet === 2 && currentSet === 1) {
-      // Need to switch from A to B
-      codewords.push(CTRL_LATCH_B)
-      codewords.push(symbolVal)
-      currentSet = 2
+    // Already in a code set that can represent the character
+    if (CODE_SETS[set]!.has(char)) {
+      codewords.push(symbolOf(set, char))
+      i++
+      continue
+    }
+
+    // A -> B: latch when the next character is also in B, otherwise shift
+    if (set === SET_A && CODE_SETS[SET_B]!.has(char)) {
+      const next = i + 1 < length ? chars[i + 1]! : -1
+      if (next >= 0 && CODE_SETS[SET_B]!.has(next)) {
+        codewords.push(symbolOf(SET_A, LB))
+        set = SET_B
+      } else {
+        codewords.push(symbolOf(SET_A, SB), symbolOf(SET_B, char))
+        i++
+      }
+      continue
+    }
+
+    // B -> A: shift one, two or three characters, or latch for longer runs
+    if (set === SET_B && CODE_SETS[SET_A]!.has(char)) {
+      const run = prefixInSet(SET_A, i)
+      if (run >= 4) {
+        codewords.push(symbolOf(SET_B, LA))
+        set = SET_A
+      } else {
+        codewords.push(symbolOf(SET_B, run === 1 ? SA : run === 2 ? SA2 : SA3))
+        for (let k = 0; k < run; k++) codewords.push(symbolOf(SET_A, chars[i + k]!))
+        i += run
+      }
+      continue
+    }
+
+    // Reachable by a plain latch
+    if (CODE_SETS[SET_A]!.has(char)) {
+      codewords.push(symbolOf(set, LA))
+      set = SET_A
+      continue
+    }
+    if (CODE_SETS[SET_B]!.has(char)) {
+      codewords.push(symbolOf(set, LB))
+      set = SET_B
+      continue
+    }
+
+    // Code sets C, D and E: shift per character, or shift + lock for runs
+    let target = -1
+    for (const candidate of [SET_C, SET_D, SET_E]) {
+      if (CODE_SETS[candidate]!.has(char)) {
+        target = candidate
+        break
+      }
+    }
+    /* v8 ignore next 6 -- every byte 0x00-0xFF lives in one of the five sets */
+    if (target === -1) {
+      throw new InvalidInputError(
+        `MaxiCode: character ${describeChar(char)} cannot be encoded in any MaxiCode code set`,
+      )
+    }
+
+    const shift = SHIFT_CODES[target - SET_C]!
+    const run = prefixInSet(target, i)
+    if (run >= 4) {
+      codewords.push(symbolOf(set, shift), symbolOf(target, LOCK_CODES[target - SET_C]!))
+      set = target
     } else {
-      // For sets C/D/E, use shift codes
-      // Shift from set A: 59 = shift to set B for one char
-      // For simplicity, encode unknown chars as space
-      codewords.push(32)
+      for (let k = 0; k < run; k++) {
+        codewords.push(symbolOf(set, shift), symbolOf(target, chars[i + k]!))
+      }
+      i += run
     }
   }
-  return codewords
+
+  return { codewords, set }
 }
 
 // ---------------------------------------------------------------------------
 // Mode 2/3: Structured Carrier Message (UPS shipping)
 // ---------------------------------------------------------------------------
 
+/** Write `value` into `bits` as `width` bits, most significant bit first. */
+function putBits(bits: Uint8Array, offset: number, value: number, width: number): void {
+  for (let i = 0; i < width; i++) {
+    bits[offset + i] = Math.floor(value / 2 ** (width - 1 - i)) % 2
+  }
+}
+
+function checkField(name: string, value: number): void {
+  if (!Number.isInteger(value) || value < 0 || value > 999) {
+    throw new InvalidInputError(`MaxiCode: ${name} must be an integer between 0 and 999`)
+  }
+}
+
 /**
  * Build the 10 primary-message codewords for modes 2 and 3.
+ *
+ * ISO/IEC 16023 §5.4 packs the 60-bit Structured Carrier Message as a 4-bit
+ * mode, a 36-bit postal code field (6-bit length + 30-bit value for mode 2, or
+ * six 6-bit Code Set A symbols for mode 3), a 10-bit country code and a 10-bit
+ * service class, interleaved across the ten codewords.
  */
 function buildPrimary(
   postalCode: string,
@@ -176,37 +396,69 @@ function buildPrimary(
   serviceClass: number,
   mode: 2 | 3,
 ): number[] {
-  const primary: number[] = []
+  checkField("country code", countryCode)
+  checkField("service class", serviceClass)
 
-  // CW0: mode indicator
-  primary.push(mode)
+  const postal = new Uint8Array(36)
 
   if (mode === 2) {
-    // Numeric postal code: 9 digits packed as a 30-bit integer
-    const postal = postalCode.replace(/\D/g, "").padEnd(9, "0").substring(0, 9)
-    const postalNum = Number.parseInt(postal, 10)
-    // 30 bits -> 5 codewords of 6 bits each (MSB first)
-    primary.push((postalNum >> 24) & 0x3f)
-    primary.push((postalNum >> 18) & 0x3f)
-    primary.push((postalNum >> 12) & 0x3f)
-    primary.push((postalNum >> 6) & 0x3f)
-    primary.push(postalNum & 0x3f)
+    let digits = postalCode
+    if (!/^\d{1,9}$/.test(digits)) {
+      throw new InvalidInputError(
+        `MaxiCode mode 2: postal code must be 1 to 9 digits, received "${postalCode}"`,
+      )
+    }
+    // US ZIP codes without the "+4" extension are zero-filled (Annex B.1.4a)
+    if (countryCode === 840 && digits.length === 5) digits += "0000"
+    putBits(postal, 0, digits.length, 6)
+    putBits(postal, 6, Number.parseInt(digits, 10), 30)
   } else {
-    // International alphanumeric postal code: 6 characters
-    const postal = postalCode.padEnd(6, " ").substring(0, 6)
-    for (const ch of postal) {
-      primary.push(ch.charCodeAt(0) & 0x3f)
+    if (postalCode.length === 0 || postalCode.length > 6) {
+      throw new InvalidInputError(
+        `MaxiCode mode 3: postal code must be 1 to 6 characters, received "${postalCode}"`,
+      )
+    }
+    const padded = postalCode.padEnd(6, " ")
+    for (let i = 0; i < 6; i++) {
+      const code = padded.charCodeAt(i)
+      const allowed = code === 32 || (code >= 34 && code <= 58) || (code >= 65 && code <= 90)
+      if (!allowed) {
+        throw new InvalidInputError(
+          `MaxiCode mode 3: postal code character ${describeChar(padded.codePointAt(i)!)} ` +
+            `is not allowed — use A-Z, space, or the ASCII range '"' to ':' (which covers 0-9)`,
+        )
+      }
+      putBits(postal, i * 6, symbolOf(SET_A, code), 6)
     }
   }
 
-  // Country code (3-digit ISO, max 999 -> 10 bits -> 2 codewords)
-  primary.push((countryCode >> 6) & 0x3f)
-  primary.push(countryCode & 0x3f)
+  const country = new Uint8Array(10)
+  putBits(country, 0, countryCode, 10)
+  const service = new Uint8Array(10)
+  putBits(service, 0, serviceClass, 10)
 
-  // Service class (3 digits -> 10 bits -> 2 codewords)
-  primary.push((serviceClass >> 6) & 0x3f)
-  primary.push(serviceClass & 0x3f)
+  // 60-bit Structured Carrier Message, most significant bit of codeword 0 first
+  const scm = new Uint8Array(60)
+  putBits(scm, 2, mode, 4)
+  scm.set(postal.subarray(0, 4), 38)
+  scm.set(postal.subarray(4, 10), 30)
+  scm.set(postal.subarray(10, 16), 24)
+  scm.set(postal.subarray(16, 22), 18)
+  scm.set(postal.subarray(22, 28), 12)
+  scm.set(postal.subarray(28, 34), 6)
+  scm.set(postal.subarray(34, 36), 0)
+  scm.set(country.subarray(0, 2), 52)
+  scm.set(country.subarray(2, 8), 42)
+  scm.set(country.subarray(8, 10), 36)
+  scm.set(service.subarray(0, 6), 54)
+  scm.set(service.subarray(6, 10), 48)
 
+  const primary: number[] = []
+  for (let i = 0; i < 10; i++) {
+    let cw = 0
+    for (let b = 0; b < 6; b++) cw = (cw << 1) | scm[i * 6 + b]!
+    primary.push(cw)
+  }
   return primary
 }
 
@@ -263,20 +515,23 @@ const MODMAP: number[] = [
   928,958,989,988,
 ];
 
-// Bullseye finder pattern + orientation mark dark positions
-// Extracted from bwip-js reference implementation (verified scannable by rxing)
-// Includes concentric rings (rows 9-23, cols 7-22) + corner marks (row 0, cols 28-29)
+// ---------------------------------------------------------------------------
+// Finder pattern
+// ---------------------------------------------------------------------------
+
+/**
+ * Dark modules of the central bullseye and of the six orientation marks.
+ *
+ * The 864 data modules never touch these positions: the bullseye rings of
+ * ISO/IEC 16023 (radii 0.5774/1.3359, 2.1058/2.8644 and 3.6229/4.3814 modules
+ * about the centre of row 16, column 14) and the fixed orientation modules are
+ * carved out of the 990-cell grid, and MODMAP skips them.
+ */
 // prettier-ignore
-const BULLSEYE_DARK: number[] = [
-  28,29,
-  277,279,280,281,282,283,285,290,308,311,312,313,316,320,338,
-  339,340,348,350,351,352,367,369,370,372,373,374,375,376,381,
-  397,401,404,406,409,411,428,431,432,433,435,436,439,440,441,
-  442,457,460,461,463,464,466,470,488,490,493,495,498,500,518,
-  521,523,524,526,530,531,532,550,552,556,558,560,578,580,582,
-  583,584,585,587,588,607,610,612,616,617,619,621,622,637,639,
-  642,643,644,645,649,650,668,670,672,677,678,680,698,699,700,
-  701,702,704,707,708,710,711,712,
+const FINDER_DARK: number[] = [
+  28,29,280,281,311,343,344,372,376,400,403,404,407,430,432,436,438,457,461,463,
+  464,466,488,490,493,495,498,500,521,523,524,526,530,550,552,556,558,580,583,
+  584,587,612,616,643,644,670,677,700,707,
 ];
 
 // ---------------------------------------------------------------------------
@@ -304,39 +559,50 @@ export function encodeMaxiCode(text: string, options: MaxiCodeOptions = {}): boo
   }
 
   const mode = options.mode ?? 4
+  if (mode !== 2 && mode !== 3 && mode !== 4 && mode !== 5 && mode !== 6) {
+    throw new InvalidInputError(`MaxiCode: mode must be 2, 3, 4, 5 or 6, received ${mode}`)
+  }
+
+  const message = encodeMaxiCodeText(text)
+  let body = message.codewords
+  let padValue = PAD_CODES[message.set]!
+
+  // Secondary message length: 68 codewords for mode 5 (enhanced ECC), else 84
+  const secondaryTotal = mode === 5 ? 68 : 84
+  const capacity = mode === 2 || mode === 3 ? secondaryTotal : secondaryTotal + 9
+
+  // Code sets C and D have no pad codeword, so latch back to A before padding
+  if (padValue === -1) {
+    if (body.length < capacity) body = [...body, symbolOf(message.set, LA)]
+    padValue = PAD_CODES[SET_A]!
+  }
+
+  if (body.length > capacity) {
+    throw new CapacityError(
+      `MaxiCode: message needs ${body.length} codewords but mode ${mode} holds ${capacity}`,
+    )
+  }
+
   let primaryData: number[]
   let secondaryRaw: number[]
 
   if (mode === 2 || mode === 3) {
-    // Primary message: 10 codewords from structured header
     primaryData = buildPrimary(
       options.postalCode ?? "",
       options.countryCode ?? 840,
       options.serviceClass ?? 1,
       mode,
     )
-    // Secondary message: the text payload
-    secondaryRaw = encodeMaxiCodeText(text)
+    secondaryRaw = Array.from<number>({ length: secondaryTotal }).fill(padValue)
+    for (const [i, cw] of body.entries()) secondaryRaw[i] = cw
   } else {
-    // Modes 4/5/6: primary is mode + first 9 data chars,
-    // secondary is the remainder
-    const allData = [mode, ...encodeMaxiCodeText(text)]
-    primaryData = allData.slice(0, 10)
-    secondaryRaw = allData.slice(10)
+    // Modes 4/5/6: mode indicator, then the message across primary and secondary
+    const all = Array.from<number>({ length: secondaryTotal + 10 }).fill(padValue)
+    all[0] = mode
+    for (const [i, cw] of body.entries()) all[i + 1] = cw
+    primaryData = all.slice(0, 10)
+    secondaryRaw = all.slice(10)
   }
-
-  // Pad primary to exactly 10 codewords
-  while (primaryData.length < 10) {
-    primaryData.push(33) // pad character (space in code set A)
-  }
-  primaryData = primaryData.slice(0, 10)
-
-  // Secondary message: pad to 84 codewords (modes 2/3/4/6) or 68 (mode 5)
-  const SECONDARY_TOTAL = mode === 5 ? 68 : 84
-  while (secondaryRaw.length < SECONDARY_TOTAL) {
-    secondaryRaw.push(33) // pad character
-  }
-  secondaryRaw = secondaryRaw.slice(0, SECONDARY_TOTAL)
 
   // Reed-Solomon error correction over GF(64)
   // Primary: 10 data codewords -> 10 EC codewords
@@ -345,16 +611,16 @@ export function encodeMaxiCode(text: string, options: MaxiCodeOptions = {}): boo
   // Secondary: split into odd and even indexed codewords
   const seco: number[] = []
   const sece: number[] = []
-  for (let i = 0; i < secondaryRaw.length; i++) {
+  for (const [i, cw] of secondaryRaw.entries()) {
     if (i % 2 === 0) {
-      seco.push(secondaryRaw[i]!)
+      seco.push(cw)
     } else {
-      sece.push(secondaryRaw[i]!)
+      sece.push(cw)
     }
   }
 
   // EC count per interleaved part
-  const secECCount = SECONDARY_TOTAL === 84 ? 20 : 28
+  const secECCount = secondaryTotal === 84 ? 20 : 28
   const secoEC = maxicodeRS(seco, secECCount)
   const seceEC = maxicodeRS(sece, secECCount)
 
@@ -389,19 +655,9 @@ export function encodeMaxiCode(text: string, options: MaxiCodeOptions = {}): boo
     }
   }
 
-  // Clear finder/bullseye area (rows 9-23, cols 7-22) then place bullseye
-  // This ensures data bits don't interfere with the finder pattern
-  for (let r = 9; r <= 23; r++) {
-    for (let c = 7; c <= 22; c++) {
-      pixs[r * COLS + c] = 0
-    }
-  }
-  // Also clear corner mark area
-  pixs[28] = 0
-  pixs[29] = 0
-
-  // Place bullseye finder pattern dark modules
-  for (const pos of BULLSEYE_DARK) {
+  // Overlay the bullseye finder and orientation marks. These positions are
+  // disjoint from MODMAP, so no data module is disturbed.
+  for (const pos of FINDER_DARK) {
     pixs[pos] = 1
   }
 

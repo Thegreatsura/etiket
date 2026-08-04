@@ -25,9 +25,12 @@ describe("QR mode detection", () => {
     expect(detectMode("HELLO 123")).toBe("alphanumeric")
   })
 
+  it("picks kanji mode for text Shift-JIS can hold", () => {
+    expect(detectMode("日本語")).toBe("kanji")
+  })
+
   it("falls back to byte mode", () => {
     expect(detectMode("hello world")).toBe("byte")
-    expect(detectMode("日本語")).toBe("byte")
     expect(detectMode("https://example.com")).toBe("byte") // lowercase
   })
 })

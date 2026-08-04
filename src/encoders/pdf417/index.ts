@@ -6,18 +6,40 @@
  * Reed-Solomon error correction over GF(929).
  */
 
+import type { PDF417MacroOptions } from "./macro"
 import { InvalidInputError, CapacityError } from "../../errors"
 import { encodeData } from "./encoder"
 import { generateECCodewords, getECCount, recommendedECLevel } from "./ec"
+import { buildMacroBlock, normalizeFileId, READER_INIT } from "./macro"
 import { getCodewordPattern, getRowCluster, START_PATTERN, STOP_PATTERN } from "./tables"
+
+export type { PDF417MacroOptions } from "./macro"
 
 export interface PDF417Options {
   /** Error correction level 0-8, default auto-selected based on data size */
   ecLevel?: number
+  /**
+   * ECI assignment number declaring the character set of the data.
+   * Left out, the encoder declares ECI 26 (UTF-8) by itself as soon as the
+   * input contains something ISO-8859-15 cannot represent.
+   */
+  eci?: number
   /** Number of data columns (1-30), auto-calculated if omitted */
   columns?: number
   /** Compact PDF417 (omits right row indicator) */
   compact?: boolean
+  /**
+   * Macro PDF417 control block, marking this symbol as one segment of a larger
+   * file. Prefer `encodePDF417Sequence`, which splits a message and fills this
+   * in for every segment.
+   */
+  macro?: PDF417MacroOptions
+  /**
+   * Mark the symbol as a reader initialisation / programming symbol
+   * (codeword 921). Such a symbol carries configuration for the scanner
+   * rather than data to pass on to the host.
+   */
+  readerInit?: boolean
 }
 
 export interface PDF417Result {
@@ -39,6 +61,12 @@ const MAX_ROWS = 90
 const MIN_COLS = 1
 /** Maximum data columns */
 const MAX_COLS = 30
+/** Segments a Macro PDF417 file may hold, ISO/IEC 15438 Annex H */
+const MAX_SEQUENCE_SYMBOLS = 99_999
+/** Largest value a codeword can carry */
+const MAX_CODEWORD_VALUE = 928
+/** Pad codeword — 900 is the text compaction latch, which decodes to nothing */
+const PAD_CODEWORD = 900
 
 /**
  * Encode text as a PDF417 barcode.
@@ -61,17 +89,20 @@ export function encodePDF417(text: string, options: PDF417Options = {}): PDF417R
 
   const compact = options.compact ?? false
 
-  // Step 1: Encode text into data codewords
-  const dataCodewords = encodeData(text)
+  // Step 1: Encode text into data codewords, and the macro control block that
+  // has to trail them
+  const bodyCodewords = buildBodyCodewords(text, options)
+  const macroBlock = options.macro ? buildMacroBlock(options.macro) : []
+  const dataLength = bodyCodewords.length + macroBlock.length
 
-  if (dataCodewords.length > MAX_DATA_CODEWORDS) {
+  if (dataLength > MAX_DATA_CODEWORDS) {
     throw new CapacityError(
-      `PDF417 data too large: ${dataCodewords.length} codewords exceeds maximum of ${MAX_DATA_CODEWORDS}`,
+      `PDF417 data too large: ${dataLength} codewords exceeds maximum of ${MAX_DATA_CODEWORDS}`,
     )
   }
 
   // Step 2: Determine EC level
-  const ecLevel = options.ecLevel ?? recommendedECLevel(dataCodewords.length)
+  const ecLevel = options.ecLevel ?? recommendedECLevel(dataLength)
   if (ecLevel < 0 || ecLevel > 8) {
     throw new InvalidInputError("PDF417 EC level must be 0-8")
   }
@@ -79,27 +110,38 @@ export function encodePDF417(text: string, options: PDF417Options = {}): PDF417R
 
   // Step 3: Calculate symbol dimensions
   // Total codewords = 1 (length descriptor) + data + EC
-  const totalDataWithLength = 1 + dataCodewords.length
-  // const totalCodewords = totalDataWithLength + ecCount;
+  const totalDataWithLength = 1 + dataLength
 
   const { rows, cols } = calculateDimensions(totalDataWithLength, ecCount, options.columns)
 
   // Step 4: Pad data to fill the grid
   // Total data codeword slots = rows * cols - ecCount
   const dataSlots = rows * cols
+  const padCount = dataSlots - ecCount - totalDataWithLength
   const paddedData: number[] = []
 
-  // Symbol length descriptor (total codewords including this one, excluding EC)
-  paddedData.push(totalDataWithLength)
-
-  // Data codewords
-  for (const cw of dataCodewords) {
-    paddedData.push(cw)
-  }
-
-  // Padding codewords (900 = text compaction latch, used as padding)
-  while (paddedData.length < dataSlots - ecCount) {
-    paddedData.push(900)
+  if (macroBlock.length > 0) {
+    // A reader takes everything after the 928 marker as part of the control
+    // block, pad codewords included — so the padding goes in front of the
+    // block and the symbol length descriptor has to cover it.
+    const descriptor = totalDataWithLength + padCount
+    if (descriptor > MAX_CODEWORD_VALUE) {
+      throw new CapacityError(
+        `Macro PDF417 symbol needs a length descriptor of ${descriptor}, above the ${MAX_CODEWORD_VALUE} a codeword holds`,
+      )
+    }
+    paddedData.push(descriptor, ...bodyCodewords)
+    // 900 latches text compaction; a run of them decodes to nothing
+    for (let i = 0; i < padCount; i++) {
+      paddedData.push(PAD_CODEWORD)
+    }
+    paddedData.push(...macroBlock)
+  } else {
+    // Symbol length descriptor (total codewords including this one, excluding EC)
+    paddedData.push(totalDataWithLength, ...bodyCodewords)
+    for (let i = 0; i < padCount; i++) {
+      paddedData.push(PAD_CODEWORD)
+    }
   }
 
   // Step 5: Generate EC codewords
@@ -116,6 +158,194 @@ export function encodePDF417(text: string, options: PDF417Options = {}): PDF417R
     rows: matrix.length,
     cols: matrix[0]!.length,
   }
+}
+
+/** Descriptive macro fields that stay the same across every segment */
+export type PDF417SharedMacroOptions = Omit<
+  PDF417MacroOptions,
+  "segmentIndex" | "fileId" | "segmentCount" | "lastSegment"
+>
+
+export interface PDF417SequenceOptions extends Omit<PDF417Options, "macro"> {
+  /**
+   * How many symbols to split the message into (1-99999).
+   * Omit to use the fewest symbols that hold the data.
+   */
+  symbols?: number
+  /**
+   * Identifier shared by every symbol of the sequence, as a decimal string in
+   * groups of three digits (each group 000-899). Derived from the message when
+   * omitted, so the segments of one message always agree and the segments of
+   * two different messages almost never do.
+   */
+  fileId?: string
+  /** Descriptive macro fields (file name, sender, addressee, ...) for every segment */
+  macro?: PDF417SharedMacroOptions
+}
+
+/**
+ * Encode text as a Macro PDF417 sequence: a set of symbols, each carrying a
+ * control block, that a reader reassembles into the original message.
+ *
+ * The segment index, the segment count and the terminator on the final symbol
+ * are all worked out here — the caller supplies the message and, at most, how
+ * many symbols to spread it over.
+ *
+ * Returns a single ordinary symbol when the data fits in one, with no macro
+ * control block: a file of one segment is not worth the overhead.
+ *
+ * @param text - The complete message
+ * @param options - Symbol count, file identity and the usual PDF417 options
+ * @returns One result per symbol, in sequence order
+ *
+ * @example
+ * ```ts
+ * const symbols = encodePDF417Sequence(longText, { symbols: 3 })
+ * // symbols[0], symbols[1], symbols[2] scan back as one message
+ * ```
+ */
+export function encodePDF417Sequence(
+  text: string,
+  options: PDF417SequenceOptions = {},
+): PDF417Result[] {
+  if (text.length === 0) {
+    throw new InvalidInputError("PDF417 input must not be empty")
+  }
+
+  const { symbols: requested, fileId, macro, ...pdf417Options } = options
+  if (
+    requested !== undefined &&
+    (!Number.isInteger(requested) || requested < 1 || requested > MAX_SEQUENCE_SYMBOLS)
+  ) {
+    throw new InvalidInputError(
+      `A Macro PDF417 sequence holds 1 to ${MAX_SEQUENCE_SYMBOLS} symbols, got ${requested}`,
+    )
+  }
+
+  const id = fileId === undefined ? defaultFileId(text) : normalizeFileId(fileId)
+  const chars = [...text]
+
+  // Start from the count the data volume calls for; chunking and the mode
+  // latches each chunk needs can still push it up by one or two
+  const first = requested ?? estimateSymbolCount(text, id, macro, pdf417Options)
+  const last = requested ?? MAX_SEQUENCE_SYMBOLS
+
+  for (let total = first; total <= last; total++) {
+    const chunks = splitEvenly(chars, total)
+    if (chunks.length !== total) continue
+
+    const sequence = tryEncodeSequence(chunks, total, id, macro, pdf417Options)
+    if (sequence) return sequence
+    if (requested !== undefined) {
+      throw new CapacityError(
+        `Data does not fit in ${total} PDF417 symbol${total === 1 ? "" : "s"} at EC level ${pdf417Options.ecLevel ?? "auto"}`,
+      )
+    }
+  }
+
+  throw new CapacityError(
+    `Data does not fit in a Macro PDF417 sequence of ${MAX_SEQUENCE_SYMBOLS} symbols`,
+  )
+}
+
+/** Encode every chunk, or return undefined if any of them overflows */
+function tryEncodeSequence(
+  chunks: string[],
+  total: number,
+  fileId: string,
+  macro: PDF417SharedMacroOptions | undefined,
+  pdf417Options: PDF417Options,
+): PDF417Result[] | undefined {
+  const results: PDF417Result[] = []
+  for (const [index, chunk] of chunks.entries()) {
+    try {
+      results.push(
+        encodePDF417(chunk, {
+          ...pdf417Options,
+          macro:
+            total > 1
+              ? {
+                  ...macro,
+                  segmentIndex: index,
+                  fileId,
+                  segmentCount: total,
+                  lastSegment: index === total - 1,
+                }
+              : undefined,
+        }),
+      )
+    } catch (error) {
+      if (error instanceof CapacityError) return undefined
+      throw error
+    }
+  }
+  return results
+}
+
+/** Fewest symbols the compacted data could possibly need */
+function estimateSymbolCount(
+  text: string,
+  fileId: string,
+  macro: PDF417SharedMacroOptions | undefined,
+  pdf417Options: PDF417Options,
+): number {
+  const dataLength = encodeData(text, { eci: pdf417Options.eci }).length
+  const overhead =
+    buildMacroBlock({
+      ...macro,
+      segmentIndex: 0,
+      fileId,
+      segmentCount: MAX_SEQUENCE_SYMBOLS,
+      lastSegment: true,
+    }).length + (pdf417Options.readerInit ? 1 : 0)
+
+  const capacity = MAX_DATA_CODEWORDS - overhead
+  if (capacity < 1) {
+    throw new CapacityError("Macro PDF417 control block leaves no room for data")
+  }
+  return Math.max(1, Math.ceil(dataLength / capacity))
+}
+
+/**
+ * Six-digit file ID derived from the message with FNV-1a, so every segment of
+ * one message carries the same identifier without the caller inventing one.
+ */
+function defaultFileId(text: string): string {
+  let hash = 0x811c_9dc5
+  for (const byte of new TextEncoder().encode(text)) {
+    hash = Math.imul(hash ^ byte, 0x0100_0193) >>> 0
+  }
+  const high = hash % 900
+  const low = Math.floor(hash / 900) % 900
+  return `${String(high).padStart(3, "0")}${String(low).padStart(3, "0")}`
+}
+
+/** Split code points into `count` chunks of as equal a size as possible */
+function splitEvenly(chars: string[], count: number): string[] {
+  const chunks: string[] = []
+  const size = Math.ceil(chars.length / count)
+  for (let i = 0; i < chars.length; i += size) {
+    chunks.push(chars.slice(i, i + size).join(""))
+  }
+  return chunks
+}
+
+/**
+ * Assemble the data codewords of a symbol, macro control block aside.
+ * Reader initialisation has to come first, before any ECI declaration.
+ */
+function buildBodyCodewords(text: string, options: PDF417Options): number[] {
+  const codewords: number[] = []
+
+  if (options.readerInit) {
+    codewords.push(READER_INIT)
+  }
+
+  for (const cw of encodeData(text, { eci: options.eci })) {
+    codewords.push(cw)
+  }
+
+  return codewords
 }
 
 /**

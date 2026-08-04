@@ -12,11 +12,37 @@ export interface QRCodeOptions {
   mode?: EncodingMode
   mask?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 // auto if omitted
   micro?: boolean
+  /**
+   * Structured Append header: this symbol is `index` of `total`, and `parity`
+   * is the XOR of every byte of the complete, unsplit message.
+   *
+   * Use `encodeQRSequence()` unless you are driving the split yourself.
+   */
   structuredAppend?: {
+    /** 0-based position of this symbol */
     index: number
+    /** Number of symbols in the sequence (2-16) */
     total: number
+    /** XOR of all bytes of the complete message */
     parity: number
   }
+  /**
+   * ECI (Extended Channel Interpretation) assignment number declaring the
+   * character set of the data, e.g. 26 for UTF-8 or 3 for ISO-8859-1.
+   */
+  eci?: number
+  /**
+   * Encode the text as GS1 element strings: the input is a parenthesised AI
+   * string such as `"(01)09501101020917(10)LOT42"`, and the symbol carries the
+   * FNC1 first-position flag that tells a reader so.
+   */
+  gs1?: boolean
+  /**
+   * Application indicator for FNC1 in the second position — either two digits
+   * (`"12"`) or a single letter (`"A"`), per the AIM application agreement the
+   * data follows. Ignored when `gs1` is set.
+   */
+  applicationIndicator?: string
 }
 
 export interface QRSegment {

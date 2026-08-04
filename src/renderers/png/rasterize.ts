@@ -2,9 +2,14 @@
  * Rasterize barcode bars and 2D matrices to PNG pixel data
  */
 
-import { encodePNG } from "./png-encoder"
+import { encodePNG, encodeTrueColorPNG } from "./png-encoder"
 import { parseHexColor } from "./types"
-import type { BarcodePNGOptions, MatrixPNGOptions, PostalPNGOptions } from "./types"
+import type {
+  BarcodePNGOptions,
+  ColorMatrixPNGOptions,
+  MatrixPNGOptions,
+  PostalPNGOptions,
+} from "./types"
 import type { PostalBar } from "../svg/postal"
 
 /**
@@ -23,7 +28,7 @@ export interface RasterData {
  * Rasterize a 1D barcode bar pattern to raw pixel rows
  */
 export function renderBarcodeRaster(bars: number[], options: BarcodePNGOptions = {}): RasterData {
-  const { scale = 2, height = 80, margin = 10 } = options
+  const { scale = options.moduleSize ?? 2, height = 80, margin = 10 } = options
 
   let totalBarWidth = 0
   for (let i = 0; i < bars.length; i++) {
@@ -73,7 +78,13 @@ export function renderPostalRaster(
   bars: readonly PostalBar[],
   options: PostalPNGOptions = {},
 ): RasterData {
-  const { scale = 2, height = 40, margin = 10, trackerRatio = 1 / 3, shortRatio = 0.4 } = options
+  const {
+    scale = options.moduleSize ?? 2,
+    height = 40,
+    margin = 10,
+    trackerRatio = 1 / 3,
+    shortRatio = 0.4,
+  } = options
   const pitch = options.pitch ?? scale * 2
 
   const fourState = bars.some((b) => typeof b === "string")
@@ -133,13 +144,21 @@ export function renderMatrixRaster(
   matrix: boolean[][],
   options: MatrixPNGOptions = {},
 ): RasterData {
-  const { moduleSize = 10, margin = 4 } = options
+  const { moduleSize = 10, margin = 4, rowHeight = 1, rowHeights } = options
 
   const matRows = matrix.length
   const matCols = matRows > 0 ? matrix[0]!.length : 0
 
+  // Pixel height of each row; stacked symbologies mix tall data rows with
+  // 1-module separators
+  const heights = Array.from(
+    { length: matRows },
+    (_, r) => (rowHeights?.[r] ?? rowHeight) * moduleSize,
+  )
+  const matrixPixels = heights.reduce((sum, h) => sum + h, 0)
+
   const width = (matCols + margin * 2) * moduleSize
-  const height = (matRows + margin * 2) * moduleSize
+  const height = matrixPixels + margin * 2 * moduleSize
 
   const marginRow = new Uint8Array(width)
   const rows: Uint8Array[] = []
@@ -156,7 +175,7 @@ export function renderMatrixRaster(
         }
       }
     }
-    for (let y = 0; y < moduleSize; y++) rows.push(row)
+    for (let y = 0; y < heights[r]!; y++) rows.push(row)
   }
 
   for (let y = 0; y < marginPixels; y++) rows.push(marginRow)
@@ -238,4 +257,65 @@ export function renderMatrixPNG(matrix: boolean[][], options: MatrixPNGOptions =
   const bg = parseHexColor(background)
   const { width, height, rows } = renderMatrixRaster(matrix, options)
   return encodePNG(width, height, rows, fg, bg, true)
+}
+
+/**
+ * Rasterize a palette-indexed matrix — as produced by the polychrome
+ * symbologies — to RGBA pixels.
+ *
+ * Palette-indexed modules cannot go through the two-colour PNG path, so this
+ * writes straight to RGBA for the true-colour encoder.
+ */
+export function renderColorMatrixRaster(
+  matrix: number[][],
+  palette: readonly string[],
+  options: ColorMatrixPNGOptions = {},
+): { width: number; height: number; rgba: Uint8Array } {
+  const { moduleSize = 10, margin = 4, background = "#ffffff" } = options
+  const colors = (options.palette ?? palette).map((color: string) => parseHexColor(color))
+  const [bgR, bgG, bgB] = parseHexColor(background)
+
+  const matRows = matrix.length
+  const matCols = matRows > 0 ? matrix[0]!.length : 0
+  const width = (matCols + margin * 2) * moduleSize
+  const height = (matRows + margin * 2) * moduleSize
+
+  const rgba = new Uint8Array(width * height * 4)
+  for (let i = 0; i < width * height; i++) {
+    rgba[i * 4] = bgR
+    rgba[i * 4 + 1] = bgG
+    rgba[i * 4 + 2] = bgB
+    rgba[i * 4 + 3] = 255
+  }
+
+  for (let r = 0; r < matRows; r++) {
+    for (let c = 0; c < matCols; c++) {
+      const color = colors[matrix[r]![c]!]
+      if (!color) continue
+      const [red, green, blue] = color
+      const startX = (margin + c) * moduleSize
+      const startY = (margin + r) * moduleSize
+      for (let y = 0; y < moduleSize; y++) {
+        for (let x = 0; x < moduleSize; x++) {
+          const i = ((startY + y) * width + startX + x) * 4
+          rgba[i] = red
+          rgba[i + 1] = green
+          rgba[i + 2] = blue
+          rgba[i + 3] = 255
+        }
+      }
+    }
+  }
+
+  return { width, height, rgba }
+}
+
+/** Render a palette-indexed matrix as a true-colour PNG */
+export function renderColorMatrixPNG(
+  matrix: number[][],
+  palette: readonly string[],
+  options: ColorMatrixPNGOptions = {},
+): Uint8Array {
+  const { width, height, rgba } = renderColorMatrixRaster(matrix, palette, options)
+  return encodeTrueColorPNG(width, height, rgba)
 }

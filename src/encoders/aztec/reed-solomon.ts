@@ -17,6 +17,8 @@
  *   GF(4096): x^12 + x^6 + x^4 + x + 1        (0x1069)
  */
 
+import { InvalidInputError } from "../../errors"
+
 import { GF_POLY } from "./tables"
 
 // ---------------------------------------------------------------------------
@@ -40,7 +42,7 @@ function getGF(wordSize: number): GFTables {
 
   const poly = GF_POLY[wordSize]
   if (poly === undefined) {
-    throw new Error(`No primitive polynomial defined for GF(2^${wordSize})`)
+    throw new InvalidInputError(`No primitive polynomial defined for GF(2^${wordSize})`)
   }
 
   const size = 1 << wordSize

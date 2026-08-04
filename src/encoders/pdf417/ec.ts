@@ -8,6 +8,8 @@
  * Coefficient tables from ISO/IEC 15438:2001(E) Annex F.
  */
 
+import { InvalidInputError } from "../../errors"
+
 const GF_MOD = 929
 
 /**
@@ -17,7 +19,7 @@ const GF_MOD = 929
  */
 export function getECCount(ecLevel: number): number {
   if (ecLevel < 0 || ecLevel > 8) {
-    throw new Error(`PDF417 EC level must be 0-8, got ${ecLevel}`)
+    throw new InvalidInputError(`PDF417 EC level must be 0-8, got ${ecLevel}`)
   }
   return 1 << (ecLevel + 1)
 }

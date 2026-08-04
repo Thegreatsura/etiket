@@ -2,9 +2,19 @@
  * PNG rendering types
  */
 
+import { InvalidInputError } from "../../errors"
+
 export interface BarcodePNGOptions {
   /** Pixels per bar unit width (default: 2) */
+  /**
+   * Pixels per module.
+   *
+   * @deprecated Prefer `moduleSize`, which every renderer accepts. `scale`
+   * keeps working and takes precedence when both are given.
+   */
   scale?: number
+  /** Pixels per module — the name every renderer accepts */
+  moduleSize?: number
   /** Image height in pixels (default: 80) */
   height?: number
   /** Quiet zone in pixels (default: 10) */
@@ -17,7 +27,15 @@ export interface BarcodePNGOptions {
 
 export interface PostalPNGOptions {
   /** Bar width in pixels (default: 2) */
+  /**
+   * Pixels per module.
+   *
+   * @deprecated Prefer `moduleSize`, which every renderer accepts. `scale`
+   * keeps working and takes precedence when both are given.
+   */
   scale?: number
+  /** Pixels per module — the name every renderer accepts */
+  moduleSize?: number
   /** Centre-to-centre distance between bars in pixels (default: scale * 2) */
   pitch?: number
   /** Full-bar height in pixels (default: 40) */
@@ -39,6 +57,18 @@ export interface MatrixPNGOptions {
   moduleSize?: number
   /** Quiet zone in modules (default: 4) */
   margin?: number
+  /**
+   * Height of each matrix row as a multiple of the module size (default 1).
+   * Stacked symbologies such as Code 16K, Codablock F, PDF417 and MicroPDF417
+   * use taller rows.
+   */
+  rowHeight?: number
+  /**
+   * Per-row heights for symbols whose rows are not all the same height — Code
+   * 16K and Codablock F use it for their 1-module separator rows. Rows past
+   * the end of the array fall back to `rowHeight`.
+   */
+  rowHeights?: number[]
   /** Foreground color as hex string (default: "#000000") */
   color?: string
   /** Background color as hex string (default: "#ffffff") */
@@ -55,11 +85,23 @@ export function parseHexColor(hex: string): [number, number, number] {
     h = h[0]! + h[0]! + h[1]! + h[1]! + h[2]! + h[2]!
   }
   if (h.length !== 6) {
-    throw new Error(`Invalid hex color: ${hex}`)
+    throw new InvalidInputError(`Invalid hex color: ${hex}`)
   }
   const n = Number.parseInt(h, 16)
   if (Number.isNaN(n)) {
-    throw new Error(`Invalid hex color: ${hex}`)
+    throw new InvalidInputError(`Invalid hex color: ${hex}`)
   }
   return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff]
+}
+
+/** Options for rendering a palette-indexed matrix, as JAB Code produces */
+export interface ColorMatrixPNGOptions {
+  /** Pixels per module (default: 10) */
+  moduleSize?: number
+  /** Quiet zone in modules (default: 4) */
+  margin?: number
+  /** Background colour as a hex string (default: "#ffffff") */
+  background?: string
+  /** Colour palette indexed by module value; overrides the encoder's palette */
+  palette?: readonly string[]
 }

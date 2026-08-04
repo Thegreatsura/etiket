@@ -2,17 +2,36 @@
  * Codablock F encoder — stacked Code 128 barcode
  * Used in healthcare and electronics for compact labeling
  *
- * Structure: multiple rows of Code 128 with row indicators
- * Each row: Start C + row indicator + data codewords + check + Stop
+ * Every row is a self-contained Code 128 symbol of `columns + 5` codewords:
+ *
+ *   Start A | subset selector | row indicator | columns data | row check | Stop
+ *
+ * The subset selector (Code C 99, Code B 100, Shift 98 meaning Code A) re-latches
+ * the character set at the start of *every* row, so the charset state never has to
+ * survive a row boundary — a digit run split across rows is re-entered into Code C
+ * on the next row. Row 0's indicator carries the row count (rows - 2), rows 1..n
+ * carry the row number + 42, and the last row's final two data positions hold the
+ * K1/K2 mod-86 symbol check characters computed over the whole message.
+ *
+ * Ported from the BWIPP reference implementation (uk.co.terryburton.bwipp
+ * codablockf), which is used as the oracle in test/encoders-codablock-f-bwip.test.ts.
  */
 
 import { InvalidInputError, CapacityError } from "../errors"
 
-// Code 128 constants
-const START_C = 105
-const CODE_A = 101
-const CODE_B = 100
+// Code 128 codeword values. Shift/latch values are identical in every subset:
+// Shift 98, Code C 99, Code B 100, Code A 101.
+const SHIFT = 98
 const CODE_C = 99
+const CODE_B = 100
+const CODE_A = 101
+const START_A = 103
+const STOP = 104
+
+const MAX_ROWS = 44
+const MIN_COLUMNS = 4
+const MAX_COLUMNS = 62
+const DEFAULT_COLUMNS = 8
 
 // Full Code 128 encoding patterns (bar/space widths), indices 0-105
 // Each pattern is 6 elements: bar, space, bar, space, bar, space
@@ -128,207 +147,326 @@ const PATTERNS: number[][] = [
 const STOP_PATTERN = [2, 3, 3, 1, 1, 1, 2]
 
 export interface CodablockFResult {
+  /**
+   * The complete symbol, including the separator rows above, below and between
+   * the data rows.
+   */
   matrix: boolean[][]
+  /** Number of data rows (the matrix has `2 * rows + 1` rows in total) */
   rows: number
   cols: number
+  /**
+   * Indices in `matrix` of the separator rows, which render 1 module tall
+   * while the data rows render at the full row height.
+   */
+  separatorRows: number[]
 }
 
-/** Count consecutive digit characters from a given position */
-function countDigitsFrom(text: string, pos: number): number {
-  let count = 0
-  while (pos + count < text.length) {
-    const c = text.charCodeAt(pos + count)
-    if (c < 48 || c > 57) break
-    count++
-  }
-  return count
-}
-
-/**
- * Determine the optimal Code 128 charset for a character.
- * Returns "A" for control chars (0-31), "B" for printable ASCII (32-126), or null if unsupported.
- */
-function charsetFor(charCode: number): "A" | "B" | null {
-  if (charCode >= 0 && charCode < 32) return "A"
-  if (charCode >= 32 && charCode <= 126) return "B"
-  return null
+/** The solid separator that closes the symbol top and bottom. */
+function solidSeparator(width: number): boolean[] {
+  return Array.from<boolean>({ length: width }).fill(true)
 }
 
 /**
- * Encode text into Code 128 codeword values with automatic charset switching.
- * Supports Code A (control chars), Code B (printable ASCII), and Code C (digit pairs).
+ * The separator between two data rows. Its ends carry a fixed pattern so a
+ * reader can tell the rows apart; the middle is solid.
  */
-function encodeValues(text: string): number[] {
-  const values: number[] = []
-  let pos = 0
+function innerSeparator(width: number): boolean[] {
+  const left = [1, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0]
+  const right = [1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0, 1, 1]
+  const middle = Array.from<number>({
+    length: Math.max(0, width - left.length - right.length),
+  }).fill(1)
+  return [...left, ...middle, ...right].slice(0, width).map((m) => m === 1)
+}
 
-  // Determine initial charset
-  const initialDigits = countDigitsFrom(text, 0)
-  let currentCharset: "A" | "B" | "C"
-  if (initialDigits >= 4 || (initialDigits >= 2 && initialDigits === text.length)) {
-    currentCharset = "C"
-  } else if (text.length > 0 && text.charCodeAt(0) < 32) {
-    currentCharset = "A"
-  } else {
-    currentCharset = "B"
+/** Code A value for a character, or -1 when Code A cannot represent it. */
+function setA(ch: number): number {
+  if (ch >= 32 && ch <= 95) return ch - 32
+  if (ch >= 0 && ch < 32) return ch + 64
+  return -1
+}
+
+/** Code B value for a character, or -1 when Code B cannot represent it. */
+function setB(ch: number): number {
+  return ch >= 32 && ch <= 127 ? ch - 32 : -1
+}
+
+/**
+ * Map a row indicator or check value (0-85) onto a codeword that decodes to the
+ * same value in Code A and Code B. Code C needs no mapping — value and codeword
+ * are identical there.
+ */
+function abMap(value: number): number {
+  if (value < 32) return value + 64
+  if (value < 48) return value - 32
+  return value - 22
+}
+
+/** K1/K2 symbol check characters — a mod-86 running weight over the raw message. */
+function symbolCheck(text: string): [k1: number, k2: number] {
+  let k1 = 0
+  let k2 = 0
+  for (let p = 0; p < text.length; p++) {
+    const ch = text.charCodeAt(p)
+    const t1 = (ch * p) % 86
+    const t2 = (t1 + ch) % 86
+    k1 = (k1 + t2) % 86
+    k2 = (k2 + t1) % 86
   }
+  return [k1, k2]
+}
 
-  while (pos < text.length) {
-    if (currentCharset === "C") {
-      const digits = countDigitsFrom(text, pos)
-      if (digits >= 2) {
-        // Encode digit pairs
-        const pairCount = Math.floor(digits / 2)
-        for (let i = 0; i < pairCount; i++) {
-          const d1 = text.charCodeAt(pos) - 48
-          const d2 = text.charCodeAt(pos + 1) - 48
-          values.push(d1 * 10 + d2)
-          pos += 2
-        }
-      } else {
-        // Switch out of Code C
-        const charCode = pos < text.length ? text.charCodeAt(pos) : -1
-        const cs = charCode >= 0 ? charsetFor(charCode) : "B"
-        if (cs === "A") {
-          values.push(CODE_A)
-          currentCharset = "A"
-        } else {
-          values.push(CODE_B)
-          currentCharset = "B"
-        }
-      }
-    } else {
-      // Code A or Code B
-      const numRun = countDigitsFrom(text, pos)
-      if (numRun >= 4 || (numRun >= 2 && pos + numRun >= text.length)) {
-        values.push(CODE_C)
-        currentCharset = "C"
-        continue
-      }
-
-      const charCode = text.charCodeAt(pos)
-      const needed = charsetFor(charCode)
-      if (needed === null) {
-        throw new InvalidInputError(
-          `Codablock F: unsupported character "${text[pos]}" (code ${charCode})`,
-        )
-      }
-
-      if (needed !== currentCharset) {
-        if (needed === "A") {
-          values.push(CODE_A)
-          currentCharset = "A"
-        } else {
-          values.push(CODE_B)
-          currentCharset = "B"
-        }
-      }
-
-      if (currentCharset === "A") {
-        // Code A: control chars 0-31 → values 64-95, printable 32-95 → values 0-63
-        if (charCode < 32) {
-          values.push(charCode + 64)
-        } else {
-          values.push(charCode - 32)
-        }
-      } else {
-        // Code B: printable 32-126 → values 0-94
-        values.push(charCode - 32)
-      }
-      pos++
+/**
+ * Expand a codeword stream into modules, starting with a bar.
+ *
+ * 104 is Start B in the Code 128 table but Codablock F only ever emits it as the
+ * Stop character, which has its own seven element pattern.
+ */
+function modulesFor(codewords: readonly number[]): boolean[] {
+  const modules: boolean[] = []
+  for (const code of codewords) {
+    const pattern = code === STOP ? STOP_PATTERN : PATTERNS[code]!
+    let isBar = true
+    for (const width of pattern) {
+      for (let n = 0; n < width; n++) modules.push(isBar)
+      isBar = !isBar
     }
   }
-
-  return values
+  return modules
 }
 
 /**
  * Encode text as Codablock F (stacked Code 128)
  *
  * @param text - Text to encode
- * @param options - columns: data columns per row (default 4-10 auto)
+ * @param options - columns: data columns per row (4-62, default 8)
  */
 export function encodeCodablockF(text: string, options?: { columns?: number }): CodablockFResult {
   if (text.length === 0) {
     throw new InvalidInputError("Codablock F input must not be empty")
   }
 
-  // Encode text into Code 128 codeword values
-  const values = encodeValues(text)
-
-  // Determine columns per row
-  const cols = options?.columns ?? Math.min(10, Math.max(4, Math.ceil(values.length / 5)))
-  const maxDataPerRow = cols
-
-  // Split into rows
-  const rowData: number[][] = []
-  for (let i = 0; i < values.length; i += maxDataPerRow) {
-    rowData.push(values.slice(i, i + maxDataPerRow))
+  const columns = options?.columns ?? DEFAULT_COLUMNS
+  if (!Number.isInteger(columns) || columns < MIN_COLUMNS || columns > MAX_COLUMNS) {
+    throw new InvalidInputError(
+      `Codablock F: columns must be an integer from ${MIN_COLUMNS} to ${MAX_COLUMNS}`,
+    )
   }
 
-  if (rowData.length > 44) {
-    throw new CapacityError("Codablock F: data exceeds maximum 44 rows")
+  const msg: number[] = []
+  for (let p = 0; p < text.length; p++) {
+    const ch = text.charCodeAt(p)
+    if (setA(ch) < 0 && setB(ch) < 0) {
+      throw new InvalidInputError(`Codablock F: unsupported character "${text[p]}" (code ${ch})`)
+    }
+    msg.push(ch)
+  }
+  const len = msg.length
+
+  // Look-ahead tables. `digits[p]` is the length of the digit run starting at p;
+  // `nextAOnly`/`nextBOnly` give the distance to the next character only Code A
+  // (respectively only Code B) can hold. The sentinel entry past the end keeps the
+  // "neither occurs again" case from selecting a subset.
+  const digits = Array.from({ length: len + 1 }, () => 0)
+  const nextAOnly = Array.from({ length: len + 1 }, () => 9999)
+  const nextBOnly = Array.from({ length: len + 1 }, () => 9999)
+  for (let p = len - 1; p >= 0; p--) {
+    const ch = msg[p]!
+    digits[p] = ch >= 48 && ch <= 57 ? digits[p + 1]! + 1 : 0
+    nextAOnly[p] = setB(ch) < 0 ? 0 : nextAOnly[p + 1]! + 1
+    nextBOnly[p] = setA(ch) < 0 ? 0 : nextBOnly[p + 1]! + 1
+  }
+  const aBeforeB = (p: number) => nextAOnly[p]! < nextBOnly[p]!
+  const bBeforeA = (p: number) => nextBOnly[p]! < nextAOnly[p]!
+
+  const rowLen = columns + 5
+  const cws = Array.from({ length: rowLen * MAX_ROWS }, () => 0)
+
+  let i = 0 // read cursor into msg
+  let j = 0 // write cursor into cws
+  let r = 1 // row being built, 1-based
+  let cset: "A" | "B" | "C" = "B"
+  let rem = 0 // data codewords left in the current row
+
+  const put = (value: number) => {
+    cws[j] = value
+    j++
+  }
+  /** Encode the current character in the active (single-byte) subset. */
+  const putChar = () => {
+    put(cset === "A" ? setA(msg[i]!) : setB(msg[i]!))
+    i++
+  }
+  /** Encode the next digit pair in Code C. */
+  const putPair = () => {
+    put((msg[i]! - 48) * 10 + (msg[i + 1]! - 48))
+    i += 2
+  }
+  /** Fill unused data positions with alternating latches, per the spec. */
+  const padRow = (count: number) => {
+    for (let n = 0; n < count; n++) {
+      if (cset === "C") {
+        put(CODE_B)
+        cset = "B"
+      } else {
+        put(CODE_C)
+        cset = "C"
+      }
+    }
   }
 
-  // Build each row as bar pattern
-  const matrix: boolean[][] = []
-
-  for (let r = 0; r < rowData.length; r++) {
-    const row = rowData[r]!
-    const codes: number[] = [START_C] // Start Code C
-
-    // Row indicator: row number encoded as Code C value
-    codes.push(r)
-
-    // Switch to Code B for data
-    codes.push(CODE_B)
-
-    // Data codewords
-    for (const v of row) {
-      codes.push(v)
+  let lastRow = false
+  while (!lastRow) {
+    if (r > MAX_ROWS) {
+      throw new CapacityError(`Codablock F: data exceeds maximum ${MAX_ROWS} rows`)
     }
 
-    // Pad remaining columns
-    while (codes.length - 3 < maxDataPerRow) {
-      codes.push(0) // space padding
+    // Start A plus the row's subset selector: the charset is re-latched per row,
+    // so a run split across rows resumes correctly instead of being misread.
+    put(START_A)
+    if (digits[i]! >= 2) {
+      put(CODE_C)
+      cset = "C"
+    } else if (aBeforeB(i)) {
+      put(SHIFT)
+      cset = "A"
+    } else {
+      put(CODE_B)
+      cset = "B"
     }
+    j++ // row indicator, filled in once the row count is known
 
-    // Checksum
-    let checksum = codes[0]!
-    for (let i = 1; i < codes.length; i++) {
-      checksum += codes[i]! * i
-    }
-    codes.push(checksum % 103)
+    let endOfRow = false
+    for (;;) {
+      rem = columns + 3 - (j % rowLen)
+      if (i === len || endOfRow) break
 
-    // Convert to bar pattern
-    const modules: boolean[] = []
+      const ch = msg[i]!
+      // Digits worth latching to Code C for, capped by what still fits in the row.
+      const remnums = Math.min(digits[i]!, rem * 2)
 
-    for (const code of codes) {
-      const pattern = PATTERNS[code]!
-      let isBar = true
-      for (const w of pattern) {
-        for (let i = 0; i < w; i++) {
-          modules.push(isBar)
+      if (cset !== "C" && remnums >= 4 && remnums % 2 === 0 && rem >= 3) {
+        put(CODE_C)
+        cset = "C"
+        putPair()
+        putPair()
+        continue
+      }
+      if (cset !== "C" && remnums >= 4 && remnums % 2 === 1 && rem >= 4) {
+        putChar() // odd run: encode the leading digit before latching
+        put(CODE_C)
+        cset = "C"
+        putPair()
+        putPair()
+        continue
+      }
+      if (cset === "B" && setB(ch) < 0 && rem >= 2) {
+        // Shift for a lone Code A character, latch when more of them follow.
+        if (i < len - 1 && bBeforeA(i + 1)) {
+          put(SHIFT)
+        } else {
+          put(CODE_A)
+          cset = "A"
         }
-        isBar = !isBar
+        put(setA(ch))
+        i++
+        continue
       }
+      if (cset === "A" && setA(ch) < 0 && rem >= 2) {
+        if (i < len - 1 && aBeforeB(i + 1)) {
+          put(SHIFT)
+        } else {
+          put(CODE_B)
+          cset = "B"
+        }
+        put(setB(ch))
+        i++
+        continue
+      }
+      if (cset === "C" && remnums < 2 && rem >= 2) {
+        if (aBeforeB(i)) {
+          put(CODE_A)
+          cset = "A"
+        } else {
+          put(CODE_B)
+          cset = "B"
+        }
+        putChar()
+        continue
+      }
+      if (cset === "A" && setA(ch) >= 0 && rem >= 1) {
+        putChar()
+        continue
+      }
+      if (cset === "B" && setB(ch) >= 0 && rem >= 1) {
+        putChar()
+        continue
+      }
+      if (cset === "C" && remnums >= 2 && rem >= 1) {
+        putPair()
+        continue
+      }
+
+      endOfRow = true
     }
 
-    // Stop pattern
-    let isBar = true
-    for (const w of STOP_PATTERN) {
-      for (let i = 0; i < w; i++) {
-        modules.push(isBar)
-      }
-      isBar = !isBar
+    // The final row reserves its last two data positions for K1/K2, and a symbol
+    // is never a single row.
+    if (r > 1 && i === len && rem >= 2) {
+      padRow(rem - 2)
+      j += 3 // K1, K2 and the row check character
+      put(STOP)
+      lastRow = true
+    } else {
+      padRow(rem)
+      j += 1 // row check character
+      put(STOP)
+      r++
     }
-
-    matrix.push(modules)
   }
+  cws.length = j
+
+  // Symbol check characters, in the subset the last row ends in
+  const [k1, k2] = symbolCheck(text)
+  cws[j - 4] = cset === "C" ? k1 : abMap(k1)
+  cws[j - 3] = cset === "C" ? k2 : abMap(k2)
+
+  // Row indicators: row count on the first row, row number + 42 afterwards
+  cws[2] = cws[1] === CODE_C ? r - 2 : abMap(r - 2)
+  for (let x = 1; x < r; x++) {
+    const p = x * rowLen + 2
+    cws[p] = cws[p - 1] === CODE_C ? x + 42 : abMap(x + 42)
+  }
+
+  // Row check characters (standard Code 128 mod 103, per row)
+  for (let x = 0; x < r; x++) {
+    const start = x * rowLen
+    let csum = cws[start]!
+    for (let k = 1; k <= columns + 2; k++) csum += cws[start + k]! * k
+    cws[start + columns + 3] = csum % 103
+  }
+
+  const dataRows: boolean[][] = []
+  for (let x = 0; x < r; x++) {
+    dataRows.push(modulesFor(cws.slice(x * rowLen, (x + 1) * rowLen)))
+  }
+
+  const width = dataRows[0]?.length ?? 0
+  const matrix: boolean[][] = []
+  const separatorRows: number[] = []
+  for (const [index, row] of dataRows.entries()) {
+    separatorRows.push(matrix.length)
+    matrix.push(index === 0 ? solidSeparator(width) : innerSeparator(width))
+    matrix.push(row)
+  }
+  separatorRows.push(matrix.length)
+  matrix.push(solidSeparator(width))
 
   return {
     matrix,
-    rows: matrix.length,
-    cols: matrix[0]?.length ?? 0,
+    rows: r,
+    cols: width,
+    separatorRows,
   }
 }

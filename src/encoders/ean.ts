@@ -2,7 +2,7 @@
  * EAN-13 and EAN-8 barcode encoder
  */
 
-import { InvalidInputError } from "../errors"
+import { InvalidInputError, CheckDigitError } from "../errors"
 
 // Encoding patterns for digits
 // L = left odd parity, G = left even parity, R = right
@@ -68,10 +68,18 @@ const GUARD_END = [1, 1, 1] // bar, space, bar
 /**
  * Calculate EAN check digit
  */
+/**
+ * GS1 modulo-10 check digit.
+ *
+ * The weights alternate 3 and 1 counting from the **right**, so the rightmost
+ * data digit always carries 3. Counting from the left happens to give the same
+ * answer for EAN-13's twelve digits and the wrong one for EAN-8's seven.
+ */
 function calculateCheckDigit(digits: number[]): number {
   let sum = 0
   for (let i = 0; i < digits.length; i++) {
-    sum += digits[i]! * (i % 2 === 0 ? 1 : 3)
+    const fromEnd = digits.length - 1 - i
+    sum += digits[i]! * (fromEnd % 2 === 0 ? 3 : 1)
   }
   return (10 - (sum % 10)) % 10
 }
@@ -88,7 +96,7 @@ export function encodeEAN13(text: string): { bars: number[]; guards: number[] } 
   } else if (digits.length === 13) {
     const expected = calculateCheckDigit(digits.slice(0, 12))
     if (digits[12] !== expected) {
-      throw new InvalidInputError(
+      throw new CheckDigitError(
         `EAN-13 check digit mismatch: expected ${expected}, got ${digits[12]}`,
       )
     }
@@ -159,7 +167,7 @@ export function encodeEAN8(text: string): { bars: number[]; guards: number[] } {
   } else if (digits.length === 8) {
     const expected = calculateCheckDigit(digits.slice(0, 7))
     if (digits[7] !== expected) {
-      throw new InvalidInputError(
+      throw new CheckDigitError(
         `EAN-8 check digit mismatch: expected ${expected}, got ${digits[7]}`,
       )
     }

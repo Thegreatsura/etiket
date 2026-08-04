@@ -210,3 +210,18 @@ export function gs1DigitalLink(
   }
   return qrcode(`${domain}${path}`, qrOpts)
 }
+
+/**
+ * Generate a GS1 QR Code — Application Identifier data under the FNC1
+ * first-position flag that tells a reader the payload is GS1 element strings.
+ *
+ * @param text - Parenthesised AI string, e.g. `"(01)09501101020917(10)LOT42"`
+ *
+ * @example
+ * ```ts
+ * const svg = gs1qr("(01)09501101020917(10)LOT42")
+ * ```
+ */
+export function gs1qr(text: string, options: QROpts = {}): string {
+  return qrcode(text, { ...options, gs1: true })
+}

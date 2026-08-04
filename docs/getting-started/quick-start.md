@@ -32,10 +32,15 @@ Import only the format you need to minimize bundle size:
 
 ```ts
 import { barcode } from "etiket/barcode" // 1D barcodes only
+import { postal } from "etiket/postal" // Postal symbologies only
 import { qrcode } from "etiket/qr" // QR codes only
 import { datamatrix } from "etiket/datamatrix"
 import { pdf417 } from "etiket/pdf417"
 import { aztec } from "etiket/aztec"
+import { maxicode } from "etiket/2d" // MaxiCode, DotCode, Han Xin, stacked, JAB
+import { qrcodePNG } from "etiket/png"
+import { InvalidInputError } from "etiket/errors"
+import { validateBarcode } from "etiket/validators"
 ```
 
 ## Output Formats

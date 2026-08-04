@@ -55,6 +55,23 @@ function countModules(svg: string): number {
   return (svg.match(/M[\d.-]+,[\d.-]+h/g) ?? []).length
 }
 
+/**
+ * Stacked symbologies draw their data rows tall and their separator rows one
+ * module high; this reads both back out of the rendered path.
+ */
+function moduleHeights(svg: string): { separator: number; taller: boolean } {
+  const drawn = [...svg.matchAll(/M[\d.-]+,[\d.-]+h([\d.]+)v([\d.]+)h/g)].map((m) => ({
+    width: Number(m[1]),
+    height: Number(m[2]),
+  }))
+  const width = drawn[0]!.width
+  const heights = new Set(drawn.map((d) => d.height))
+  return {
+    separator: Math.min(...heights) / width,
+    taller: Math.max(...heights) > width,
+  }
+}
+
 describe("2D format SVG API", () => {
   const cases: Array<[string, () => string]> = [
     ["microqr", () => microqr("12345")],
@@ -176,16 +193,18 @@ describe("stacked symbologies", () => {
     expect(Number(m[2])).toBeGreaterThan(Number(m[1]))
   })
 
-  it("codablockf uses taller rows than wide modules", () => {
-    const svg = codablockf("CODABLOCK", { margin: 0 })
-    const m = /M[\d.-]+,[\d.-]+h([\d.]+)v([\d.]+)h/.exec(svg)!
-    expect(Number(m[2])).toBeGreaterThan(Number(m[1]))
+  it("codablockf uses taller data rows and 1-module separators", () => {
+    expect(moduleHeights(codablockf("CODABLOCK", { margin: 0 }))).toEqual({
+      separator: 1,
+      taller: true,
+    })
   })
 
-  it("code16k uses taller rows than wide modules", () => {
-    const svg = code16k("CODE16K", { margin: 0 })
-    const m = /M[\d.-]+,[\d.-]+h([\d.]+)v([\d.]+)h/.exec(svg)!
-    expect(Number(m[2])).toBeGreaterThan(Number(m[1]))
+  it("code16k uses taller data rows and 1-module separators", () => {
+    expect(moduleHeights(code16k("CODE16K", { margin: 0 }))).toEqual({
+      separator: 1,
+      taller: true,
+    })
   })
 
   it("allows rowHeight to be overridden", () => {

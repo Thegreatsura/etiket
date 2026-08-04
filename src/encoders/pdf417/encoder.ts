@@ -3,6 +3,7 @@
  * Supports Text, Byte, and Numeric compaction modes
  */
 
+import { InvalidInputError } from "../../errors"
 import {
   TEXT_ALPHA_MAP,
   TEXT_LOWER_MAP,
@@ -13,17 +14,45 @@ import {
   TextSubMode,
 } from "./tables"
 
+/** ECI assignment number for UTF-8 */
+const ECI_UTF8 = 26
+
+export interface PDF417DataOptions {
+  /**
+   * ECI assignment number declaring the character set of the data.
+   * Omit and the encoder declares ECI 26 (UTF-8) by itself as soon as the
+   * input contains something ISO-8859-15 cannot represent.
+   */
+  eci?: number
+}
+
 /**
  * Encode input text into PDF417 data codewords.
  * Auto-detects the best compaction mode for segments of the input.
  *
  * @param text - Input string to encode
+ * @param options - ECI declaration
  * @returns Array of codeword values (0-928), not including symbol length descriptor or EC
  */
-export function encodeData(text: string): number[] {
-  const bytes = textToBytes(text)
-  const segments = analyzeSegments(bytes)
+export function encodeData(text: string, options: PDF417DataOptions = {}): number[] {
+  const latin = toLatinBytes(text)
   const codewords: number[] = []
+
+  // Anything ISO-8859-15 cannot hold goes out as UTF-8 under an ECI
+  // declaration; truncating it to the low byte would corrupt the payload
+  // while leaving the symbol perfectly scannable.
+  if (latin === undefined) {
+    pushECI(codewords, options.eci ?? ECI_UTF8)
+    encodeByteSegment([...new TextEncoder().encode(text)], codewords)
+    return codewords
+  }
+
+  if (options.eci !== undefined) {
+    pushECI(codewords, options.eci)
+  }
+
+  const bytes = latin
+  const segments = analyzeSegments(bytes)
 
   for (const segment of segments) {
     switch (segment.mode) {
@@ -62,8 +91,11 @@ const ISO_8859_15_MAP: Record<number, number> = {
   0x0178: 0xbe, // Ÿ
 }
 
-/** Convert string to byte array with ISO-8859-15 support */
-function textToBytes(text: string): number[] {
+/**
+ * Convert a string to ISO-8859-15 bytes, or undefined when a character cannot
+ * be represented — the caller then falls back to UTF-8 under an ECI.
+ */
+function toLatinBytes(text: string): number[] | undefined {
   const bytes: number[] = []
   for (let i = 0; i < text.length; i++) {
     const code = text.charCodeAt(i)
@@ -73,11 +105,29 @@ function textToBytes(text: string): number[] {
     } else if (code <= 0xff) {
       bytes.push(code)
     } else {
-      // Fallback: use byte compaction for non-Latin characters
-      bytes.push(code & 0xff)
+      return undefined
     }
   }
   return bytes
+}
+
+/**
+ * Emit an ECI designator per ISO/IEC 15438:
+ * 927 + 1 codeword for 0-899, 926 + 2 codewords for 900-810899,
+ * 925 + 1 codeword for the user-defined range 810900-811799.
+ */
+function pushECI(codewords: number[], eci: number): void {
+  if (!Number.isInteger(eci) || eci < 0 || eci > 811_799) {
+    throw new InvalidInputError(`PDF417 ECI assignment number must be 0-811799, got ${eci}`)
+  }
+  if (eci <= 899) {
+    codewords.push(MODE_LATCH.ECI_CHARSET, eci)
+  } else if (eci <= 810_899) {
+    const value = eci - 900
+    codewords.push(MODE_LATCH.ECI_GENERAL, Math.floor(value / 900), value % 900)
+  } else {
+    codewords.push(MODE_LATCH.ECI_USER, eci - 810_900)
+  }
 }
 
 /** Check if a character is encodable in text compaction mode */
@@ -174,7 +224,21 @@ function encodeTextSegment(text: string, codewords: number[]): void {
     codewords.push(MODE_LATCH.TEXT_COMPACTION)
   }
 
+  for (const cw of textToCodewords(text)) {
+    codewords.push(cw)
+  }
+}
+
+/**
+ * Pack text into codewords without a mode latch.
+ *
+ * This is the form the Macro PDF417 optional fields take: the reader is
+ * already in text compaction when it reads them, so the 900 latch must not
+ * appear.
+ */
+export function textToCodewords(text: string): number[] {
   const subCodewords = textToSubCodewords(text)
+  const codewords: number[] = []
 
   // Pack sub-codewords into pairs → codewords
   // Each pair: high * 30 + low
@@ -183,6 +247,8 @@ function encodeTextSegment(text: string, codewords: number[]): void {
     const low = i + 1 < subCodewords.length ? subCodewords[i + 1]! : 29 // pad with 29 (PS) per ISO 15438 5.4.2.1
     codewords.push(high * 30 + low)
   }
+
+  return codewords
 }
 
 /**
@@ -337,16 +403,31 @@ function getCharValue(ch: string, mode: TextSubMode): number {
 function encodeNumericSegment(digits: string, codewords: number[]): void {
   codewords.push(MODE_LATCH.NUMERIC_COMPACTION)
 
+  for (const cw of numericToCodewords(digits)) {
+    codewords.push(cw)
+  }
+}
+
+/**
+ * Encode a run of digits with numeric compaction, without the 902 mode latch.
+ *
+ * The Macro PDF417 optional fields that carry numbers (segment count, time
+ * stamp, file size, checksum) use this bare form.
+ */
+export function numericToCodewords(digits: string): number[] {
+  const codewords: number[] = []
+
   // Process in groups of up to 44 digits
   let pos = 0
   while (pos < digits.length) {
     const chunk = digits.slice(pos, pos + 44)
-    const numericCodewords = numericToBase900(chunk)
-    for (const cw of numericCodewords) {
+    for (const cw of numericToBase900(chunk)) {
       codewords.push(cw)
     }
     pos += 44
   }
+
+  return codewords
 }
 
 /**

@@ -27,6 +27,10 @@ export {
   codablockf,
   code16k,
   jabcode,
+  gs1composite,
+  gs1databarStacked,
+  gs1databarStackedOmni,
+  gs1databarExpandedStacked,
 } from "./_2d"
 export { postal, postalDataURI, postalBase64, encodePostal } from "./_postal"
 export type { PostalType, PostalEncodingOptions, PostalOptions } from "./_postal"
@@ -43,9 +47,12 @@ export {
   event,
   swissQR,
   gs1DigitalLink,
+  gs1qr,
 } from "./_helpers"
 
 // --- Types ---
+/** The symbology names, at runtime — handy for building a picker */
+export { BARCODE_TYPES, ENCODE_TYPES } from "./_types"
 export type {
   BarcodeType,
   BarcodeEncodingOptions,
@@ -75,7 +82,8 @@ export type { ErrorCorrectionLevel, EncodingMode } from "./encoders/qr/types"
 export { encodeCode128 } from "./encoders/code128"
 export type { Code128Charset, Code128Options } from "./encoders/code128"
 export { encodeEAN13, encodeEAN8 } from "./encoders/ean"
-export { encodeQR } from "./encoders/qr/index"
+export { encodeQR, encodeQRSequence } from "./encoders/qr/index"
+export type { QRSequenceOptions } from "./encoders/qr/index"
 export { encodeMicroQR } from "./encoders/qr/micro"
 export type { MicroQROptions } from "./encoders/qr/micro"
 export { encodeCode39, encodeCode39Extended } from "./encoders/code39"
@@ -92,12 +100,22 @@ export { encodeGS1128 } from "./encoders/gs1-128"
 export { encodeIdentcode, encodeLeitcode } from "./encoders/deutsche-post"
 export { encodePOSTNET, encodePLANET } from "./encoders/postnet"
 export { encodePlessey } from "./encoders/plessey"
-export { encodeGS1Composite } from "./encoders/gs1-composite"
-export type { CompositeType, GS1CompositeResult } from "./encoders/gs1-composite"
+export { encodeGS1Composite, encodeGS1CompositeSymbol } from "./encoders/gs1-composite"
+export type {
+  CompositeType,
+  CompositeLinearType,
+  GS1CompositeOptions,
+  GS1CompositeResult,
+  GS1CompositeSymbolResult,
+} from "./encoders/gs1-composite"
 export {
   encodeGS1DataBarOmni,
   encodeGS1DataBarLimited,
   encodeGS1DataBarExpanded,
+  encodeGS1DataBarTruncated,
+  encodeGS1DataBarStacked,
+  encodeGS1DataBarStackedOmni,
+  encodeGS1DataBarExpandedStacked,
 } from "./encoders/gs1-databar"
 export { encodeRM4SCC, encodeKIX, encodeAustraliaPost, encodeJapanPost } from "./encoders/fourstate"
 export type { FourState } from "./encoders/fourstate"
@@ -109,12 +127,24 @@ export type { MaxiCodeOptions } from "./encoders/maxicode"
 export { encodeRMQR } from "./encoders/rmqr"
 export type { RMQROptions } from "./encoders/rmqr"
 export { encodeDotCode } from "./encoders/dotcode"
+export type { DotCodeOptions } from "./encoders/dotcode"
 export { encodeHanXin } from "./encoders/hanxin"
 export type { HanXinOptions } from "./encoders/hanxin"
 export { encodeJABCode, JAB_COLORS_4, JAB_COLORS_8 } from "./encoders/jabcode"
 export type { JABCodeOptions, JABCodeResult } from "./encoders/jabcode"
 export { encodeDataMatrix, encodeGS1DataMatrix } from "./encoders/datamatrix/index"
-export { encodePDF417 } from "./encoders/pdf417/index"
+export type {
+  DataMatrixShape,
+  DataMatrixSizeOptions,
+  SymbolSize as DataMatrixSymbolSize,
+} from "./encoders/datamatrix/tables"
+export { SYMBOL_SIZES as DATAMATRIX_SYMBOL_SIZES } from "./encoders/datamatrix/tables"
+export { encodePDF417, encodePDF417Sequence } from "./encoders/pdf417/index"
+export type {
+  PDF417SequenceOptions,
+  PDF417MacroOptions,
+  PDF417SharedMacroOptions,
+} from "./encoders/pdf417/index"
 export type { PDF417Options } from "./encoders/pdf417/index"
 export { encodeMicroPDF417 } from "./encoders/micropdf417"
 export type { MicroPDF417Options } from "./encoders/micropdf417"
@@ -158,7 +188,17 @@ export {
   codablockfPNG,
   codablockfPNGDataURI,
   code16kPNG,
+  gs1databarStackedPNG,
+  gs1databarStackedPNGDataURI,
+  gs1databarStackedOmniPNG,
+  gs1databarStackedOmniPNGDataURI,
+  gs1databarExpandedStackedPNG,
+  gs1databarExpandedStackedPNGDataURI,
   code16kPNGDataURI,
+  jabcodePNG,
+  jabcodePNGDataURI,
+  gs1compositePNG,
+  gs1compositePNGDataURI,
   maxicodePNG,
   maxicodePNGDataURI,
 } from "./_png"
@@ -202,3 +242,7 @@ export {
 } from "./validators/barcode"
 export { validateQRInput } from "./validators/qr"
 export type { QRValidationResult } from "./validators/qr"
+
+// Batch generation and label sheets
+export { barcodes, qrcodes, barcodeSheet, qrcodeSheet } from "./_batch"
+export type { BatchOptions, SheetOptions, BarcodeSheetOptions, QRCodeSheetOptions } from "./_batch"

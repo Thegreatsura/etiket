@@ -17,6 +17,13 @@ export interface MatrixSVGOptions extends SVGAccessibilityOptions {
    * Codablock-F, PDF417 and MicroPDF417 use taller rows.
    */
   rowHeight?: number
+  /**
+   * Per-row heights, as multiples of the module width, for symbols whose rows
+   * are not all the same height. Code 16K and Codablock F use it for their
+   * 1-module separator rows. Rows past the end of the array fall back to
+   * `rowHeight`.
+   */
+  rowHeights?: number[]
 }
 
 /**
@@ -40,11 +47,19 @@ export function renderMatrixSVG(matrix: boolean[][], options: MatrixSVGOptions =
   const maxDim = Math.max(rowCount, colCount)
   const totalModules = maxDim + margin * 2
   const moduleSize = size / totalModules
-  const moduleHeight = moduleSize * rowHeight
+
+  // Height of each row in modules, and the y offset it starts at
+  const heights = Array.from({ length: rowCount }, (_, r) => options.rowHeights?.[r] ?? rowHeight)
+  const offsets: number[] = []
+  let stacked = 0
+  for (const height of heights) {
+    offsets.push(stacked)
+    stacked += height
+  }
 
   // For rectangular matrices, compute actual SVG dimensions
   const svgWidth = (colCount + margin * 2) * moduleSize
-  const svgHeight = rowCount * moduleHeight + margin * 2 * moduleSize
+  const svgHeight = (stacked + margin * 2) * moduleSize
 
   // Build SVG opening tag with accessibility attributes
   let svgOpen = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgWidth} ${svgHeight}" width="${svgWidth}" height="${svgHeight}" role="${escapeAttr(role)}"`
@@ -73,8 +88,9 @@ export function renderMatrixSVG(matrix: boolean[][], options: MatrixSVGOptions =
     for (let c = 0; c < colCount; c++) {
       if (matrix[r]![c]) {
         const x = (c + margin) * moduleSize
-        const y = margin * moduleSize + r * moduleHeight
-        pathParts.push(`M${x},${y}h${moduleSize}v${moduleHeight}h-${moduleSize}z`)
+        const y = (margin + offsets[r]!) * moduleSize
+        const height = heights[r]! * moduleSize
+        pathParts.push(`M${x},${y}h${moduleSize}v${height}h-${moduleSize}z`)
       }
     }
   }

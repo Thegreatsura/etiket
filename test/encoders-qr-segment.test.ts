@@ -45,8 +45,28 @@ describe("QR segment optimization", () => {
   it("preserves all characters", () => {
     const text = "ABC123def456"
     const segs = optimizeSegments(text, 1)
-    const reconstructed = segs.map((s) => new TextDecoder().decode(s.data as Uint8Array)).join("")
+    const reconstructed = segs
+      .map((s) => (typeof s.data === "string" ? s.data : new TextDecoder().decode(s.data)))
+      .join("")
     expect(reconstructed).toBe(text)
+  })
+
+  it("only puts a character in a mode that can encode it", () => {
+    for (const seg of optimizeSegments("Hello 123 WORLD-42/ok", 1)) {
+      const text = typeof seg.data === "string" ? seg.data : new TextDecoder().decode(seg.data)
+      if (seg.mode === "numeric") expect(text).toMatch(/^\d+$/)
+      if (seg.mode === "alphanumeric") expect(text).toMatch(/^[\dA-Z $%*+\-./:]+$/)
+    }
+  })
+
+  it("never costs more than encoding everything as bytes", () => {
+    const text = "PRODUCT-12345678901234567890/BATCH-99"
+    const segs = optimizeSegments(text, 1)
+    const segmentedBits = segs.reduce((sum, s) => {
+      const perChar = s.mode === "numeric" ? 10 / 3 : s.mode === "alphanumeric" ? 5.5 : 8
+      return sum + 4 + 10 + Math.ceil(s.charCount * perChar)
+    }, 0)
+    expect(segmentedBits).toBeLessThan(4 + 8 + text.length * 8)
   })
 
   it("works at higher versions", () => {

@@ -192,34 +192,172 @@ function encodeC40Text(
   return codewords
 }
 
+// X12 character set: CR=0, *=1, >=2, space=3, 0-9=4-13, A-Z=14-39
+function x12Value(ch: number): { set: number; value: number } {
+  if (ch === 13) return { set: 0, value: 0 }
+  if (ch === 42) return { set: 0, value: 1 }
+  if (ch === 62) return { set: 0, value: 2 }
+  if (ch === 32) return { set: 0, value: 3 }
+  if (ch >= 48 && ch <= 57) return { set: 0, value: ch - 48 + 4 }
+  if (ch >= 65 && ch <= 90) return { set: 0, value: ch - 65 + 14 }
+  return { set: -1, value: 0 }
+}
+
 /**
- * Auto-select best encoding mode for the given text
- * Returns the most efficient encoding
+ * Encode text using X12 mode (ANSI X12 EDI: A-Z, 0-9, space, CR, * and >).
+ * 3 characters → 2 codewords. Latch 238.
+ *
+ * X12 has no shift mechanism, so the whole run must be X12-encodable and the
+ * character count must be a multiple of 3; anything else falls back to ASCII.
  */
-export function encodeAuto(text: string): number[] {
-  // Count uppercase vs lowercase to decide
-  let upper = 0
-  let lower = 0
-  let digits = 0
+export function encodeX12(text: string): number[] | undefined {
+  if (text.length === 0 || text.length % 3 !== 0) return undefined
+
+  const values: number[] = []
   for (const ch of text) {
-    const c = ch.charCodeAt(0)
-    if (c >= 65 && c <= 90) upper++
-    else if (c >= 97 && c <= 122) lower++
-    else if (c >= 48 && c <= 57) digits++
+    const { set, value } = x12Value(ch.charCodeAt(0))
+    if (set === -1) return undefined
+    values.push(value)
   }
 
-  // C40 is best for uppercase-heavy, Text for lowercase-heavy
-  const asciiCW = encodeASCII(text)
+  const codewords: number[] = [238]
+  for (let i = 0; i < values.length; i += 3) {
+    const v = values[i]! * 1600 + values[i + 1]! * 40 + values[i + 2]! + 1
+    codewords.push(Math.floor(v / 256), v % 256)
+  }
+  // An exact multiple of 3 needs no unlatch when the symbol ends here, but the
+  // symbol size is not known yet, so unlatch and let encodeAuto compare lengths.
+  codewords.push(254)
+  return codewords
+}
 
-  if (upper + digits > text.length * 0.6) {
-    const c40CW = encodeC40(text)
-    if (c40CW.length < asciiCW.length) return c40CW
+/**
+ * Encode text using EDIFACT mode (ASCII 32-94, 6 bits per character).
+ * 4 characters → 3 codewords. Latch 240, unlatch is the 6-bit value 31.
+ */
+export function encodeEDIFACT(text: string): number[] | undefined {
+  if (text.length === 0) return undefined
+
+  const values: number[] = []
+  for (const ch of text) {
+    const code = ch.charCodeAt(0)
+    if (code < 32 || code > 94) return undefined
+    values.push(code & 0x3f)
   }
 
-  if (lower + digits > text.length * 0.6) {
-    const textCW = encodeTextMode(text)
-    if (textCW.length < asciiCW.length) return textCW
+  // Unlatch so that padding after the segment is read as ASCII
+  values.push(31)
+
+  const codewords: number[] = [240]
+  for (let i = 0; i < values.length; i += 4) {
+    const quad = [values[i] ?? 0, values[i + 1] ?? 0, values[i + 2] ?? 0, values[i + 3] ?? 0]
+    const packed = (quad[0]! << 18) | (quad[1]! << 12) | (quad[2]! << 6) | quad[3]!
+    codewords.push((packed >> 16) & 0xff, (packed >> 8) & 0xff, packed & 0xff)
+  }
+  return codewords
+}
+
+/**
+ * Encode bytes using Base 256 mode (latch 231).
+ *
+ * The length field and every data byte are randomised with the 255-state
+ * algorithm so that binary payloads cannot imitate the finder patterns.
+ */
+export function encodeBase256(bytes: Uint8Array | number[], startPosition = 1): number[] {
+  const data = [...bytes]
+  const codewords: number[] = [231]
+  // Position of the first length codeword within the whole codeword stream
+  let position = startPosition + 1
+
+  if (data.length < 250) {
+    codewords.push(randomize255(data.length, position++))
+  } else {
+    codewords.push(randomize255(Math.floor(data.length / 250) + 249, position++))
+    codewords.push(randomize255(data.length % 250, position++))
   }
 
-  return asciiCW
+  for (const byte of data) {
+    codewords.push(randomize255(byte, position++))
+  }
+
+  return codewords
+}
+
+/** 255-state randomisation for Base 256 values */
+function randomize255(value: number, position: number): number {
+  const pseudoRandom = ((149 * position) % 255) + 1
+  const result = value + pseudoRandom
+  return result <= 255 ? result : result - 256
+}
+
+/**
+ * Emit an ECI designator (codeword 241 plus 1-3 value codewords) per ISO 16022.
+ */
+export function encodeECI(eci: number): number[] {
+  if (!Number.isInteger(eci) || eci < 0 || eci > 999_999) {
+    throw new InvalidInputError(`Data Matrix ECI assignment number must be 0-999999, got ${eci}`)
+  }
+  if (eci <= 126) return [241, eci + 1]
+  if (eci <= 16_382) {
+    const value = eci - 127
+    return [241, Math.floor(value / 254) + 128, (value % 254) + 1]
+  }
+  const value = eci - 16_383
+  return [
+    241,
+    Math.floor(value / 64_516) + 192,
+    (Math.floor(value / 254) % 254) + 1,
+    (value % 254) + 1,
+  ]
+}
+
+export interface DataMatrixEncodeOptions {
+  /**
+   * ECI assignment number declaring the character set.
+   * Omit and the encoder declares ECI 26 (UTF-8) by itself as soon as the input
+   * contains a character Latin-1 cannot represent.
+   */
+  eci?: number
+}
+
+/**
+ * Auto-select the best encoding mode for the given text.
+ *
+ * Every applicable mode is tried and the shortest codeword stream wins, which
+ * is both simpler and better than the old heuristic — it cannot pick a mode
+ * that turns out longer.
+ */
+export function encodeAuto(text: string, options: DataMatrixEncodeOptions = {}): number[] {
+  // Anything Latin-1 cannot hold goes out as UTF-8 bytes under an ECI
+  // declaration, in Base 256 so no byte is reinterpreted.
+  if ([...text].some((ch) => ch.codePointAt(0)! > 0xff)) {
+    const eci = encodeECI(options.eci ?? 26)
+    return [...eci, ...encodeBase256(new TextEncoder().encode(text), eci.length + 1)]
+  }
+
+  const prefix = options.eci === undefined ? [] : encodeECI(options.eci)
+
+  const candidates: number[][] = [encodeASCII(text)]
+  const c40 = encodeC40(text)
+  if (isLossless(c40)) candidates.push(c40)
+  const textMode = encodeTextMode(text)
+  if (isLossless(textMode)) candidates.push(textMode)
+  const x12 = encodeX12(text)
+  if (x12) candidates.push(x12)
+  const edifact = encodeEDIFACT(text)
+  if (edifact) candidates.push(edifact)
+
+  let best = candidates[0]!
+  for (const candidate of candidates) {
+    if (candidate.length < best.length) best = candidate
+  }
+  return prefix.length > 0 ? [...prefix, ...best] : best
+}
+
+/**
+ * C40/Text encoders fall back to ASCII for characters they cannot represent, so
+ * their output is always valid — this only guards against an empty result.
+ */
+function isLossless(codewords: number[]): boolean {
+  return codewords.length > 0
 }
