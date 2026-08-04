@@ -12,11 +12,25 @@ export interface QRCodeOptions {
   mode?: EncodingMode
   mask?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 // auto if omitted
   micro?: boolean
+  /**
+   * Structured Append header: this symbol is `index` of `total`, and `parity`
+   * is the XOR of every byte of the complete, unsplit message.
+   *
+   * Use `encodeQRSequence()` unless you are driving the split yourself.
+   */
   structuredAppend?: {
+    /** 0-based position of this symbol */
     index: number
+    /** Number of symbols in the sequence (2-16) */
     total: number
+    /** XOR of all bytes of the complete message */
     parity: number
   }
+  /**
+   * ECI (Extended Channel Interpretation) assignment number declaring the
+   * character set of the data, e.g. 26 for UTF-8 or 3 for ISO-8859-1.
+   */
+  eci?: number
 }
 
 export interface QRSegment {

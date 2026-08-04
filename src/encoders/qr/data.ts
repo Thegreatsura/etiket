@@ -16,7 +16,7 @@ import {
   pushBits,
 } from "./mode"
 import { addErrorCorrection } from "./reed-solomon"
-import { CapacityError } from "../../errors"
+import { CapacityError, InvalidInputError } from "../../errors"
 
 export interface EncodedData {
   version: number
@@ -33,7 +33,7 @@ export function encodeData(text: string, options: QRCodeOptions = {}): EncodedDa
   const ecInfo = getECInfo(version, ecLevel)
 
   // Build data bitstream
-  const dataBits = buildDataBits(segments, version, ecInfo.totalDataCodewords)
+  const dataBits = buildDataBits(segments, version, ecInfo.totalDataCodewords, options)
 
   // Convert bits to bytes
   const dataBytes = bitsToBytes(dataBits)
@@ -80,7 +80,7 @@ export function planEncoding(
 
   if (options.version !== undefined) {
     const segments = segmentsFor(text, options.version, forcedMode)
-    const needed = totalBits(segments, options.version)
+    const needed = headerBits(options) + totalBits(segments, options.version)
     const capacity = getDataCapacityBits(options.version, ecLevel)
     if (needed > capacity) {
       throw new CapacityError(
@@ -92,7 +92,10 @@ export function planEncoding(
 
   for (let version = 1; version <= 40; version++) {
     const segments = segmentsFor(text, version, forcedMode)
-    if (totalBits(segments, version) <= getDataCapacityBits(version, ecLevel)) {
+    if (
+      headerBits(options) + totalBits(segments, version) <=
+      getDataCapacityBits(version, ecLevel)
+    ) {
       return { version, segments }
     }
   }
@@ -141,8 +144,11 @@ function buildDataBits(
   segments: QRSegment[],
   version: number,
   totalDataCodewords: number,
+  options: QRCodeOptions,
 ): number[] {
   const bits: number[] = []
+
+  appendHeaders(bits, options)
 
   for (const segment of segments) {
     appendSegment(bits, segment, version)
@@ -168,6 +174,64 @@ function buildDataBits(
   }
 
   return bits
+}
+
+/**
+ * Bits taken by the Structured Append and ECI headers, which sit in front of
+ * the data segments and therefore eat into the version's capacity.
+ */
+function headerBits(options: QRCodeOptions): number {
+  let bits = 0
+  if (options.structuredAppend) bits += 4 + 4 + 4 + 8
+  if (options.eci !== undefined) bits += 4 + eciDesignatorBits(options.eci)
+  return bits
+}
+
+function eciDesignatorBits(eci: number): number {
+  if (eci < 0 || eci > 999_999) {
+    throw new InvalidInputError(`ECI assignment number must be 0-999999, got ${eci}`)
+  }
+  if (eci < 128) return 8
+  if (eci < 16_384) return 16
+  return 24
+}
+
+/**
+ * Emit the Structured Append and ECI headers, in the order ISO/IEC 18004
+ * requires: the sequence header first, then the character-set declaration,
+ * then the data segments.
+ */
+function appendHeaders(bits: number[], options: QRCodeOptions): void {
+  const sa = options.structuredAppend
+  if (sa) {
+    if (sa.total < 2 || sa.total > 16) {
+      throw new InvalidInputError(
+        `Structured Append needs between 2 and 16 symbols, got ${sa.total}`,
+      )
+    }
+    if (sa.index < 0 || sa.index >= sa.total) {
+      throw new InvalidInputError(
+        `Structured Append index ${sa.index} is outside the sequence of ${sa.total}`,
+      )
+    }
+    pushBits(bits, MODE_INDICATOR.structuredAppend, 4)
+    pushBits(bits, sa.index, 4)
+    pushBits(bits, sa.total - 1, 4)
+    pushBits(bits, sa.parity & 0xff, 8)
+  }
+
+  if (options.eci !== undefined) {
+    const designatorBits = eciDesignatorBits(options.eci)
+    pushBits(bits, MODE_INDICATOR.eci, 4)
+    // 8-bit designators are written plain, 16-bit are prefixed 10, 24-bit 110
+    if (designatorBits === 8) {
+      pushBits(bits, options.eci, 8)
+    } else if (designatorBits === 16) {
+      pushBits(bits, 0b10_000000_00000000 | options.eci, 16)
+    } else {
+      pushBits(bits, 0b110_00000_00000000_00000000 | options.eci, 24)
+    }
+  }
 }
 
 /** Append one segment's mode indicator, character count and payload */
