@@ -82,10 +82,6 @@ const DIVERGENT: Record<string, string> = {
     "differs: etiket picks 1x11 where BWIPP picks 1x14 for the same data; where both pick " +
     "the same variant the module pattern is identical",
 
-  hanxin:
-    "#102 — the symbol size agrees (23x23) but only the fixed finder patterns match; every " +
-    "data row differs (no masking, no function information, invented capacity)",
-
   "gs1-composite":
     "#104 — etiket stuffs the literal AI text into a MicroPDF417 (11 x 54 modules); BWIPP " +
     "emits the real CC-A composite component (3 x 99 modules)",
@@ -432,7 +428,10 @@ describe("bwip-js cross-verification: stacked and 2D", () => {
 
   runMatrix({
     format: "hanxin",
-    payloads: ["ABC123", "Hello", "123456"],
+    // Byte-mode payloads only: bwip-js 4.11.2's transpiled numeric branch reads
+    // past the end of the digit run, so it is not a usable oracle there. Numeric
+    // mode is covered in test/encoders-hanxin-bwip.test.ts against the spec.
+    payloads: ["ABC123", "Hello", "Han Xin Code"],
     etiket: (p) => encodeHanXin(p),
     bwip: (p) => bwipMatrix("hanxin", p),
   })

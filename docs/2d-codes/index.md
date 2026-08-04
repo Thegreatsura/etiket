@@ -174,12 +174,17 @@ hanxin("HELLO")
 hanxin("HELLO", { ecLevel: 3, version: 5 })
 ```
 
-| Option    | Type   | Default | Description                                 |
-| :-------- | :----- | :------ | :------------------------------------------ |
-| `ecLevel` | `1-4`  | `1`     | L1 ≈ 8%, L2 ≈ 15%, L3 ≈ 23%, L4 ≈ 30%       |
-| `version` | `1-84` | auto    | Symbol is `version * 2 + 21` modules square |
+| Option    | Type   | Default | Description                                     |
+| :-------- | :----- | :------ | :---------------------------------------------- |
+| `ecLevel` | `1-4`  | `2`     | L1 ≈ 8%, L2 ≈ 15%, L3 ≈ 23%, L4 ≈ 30%           |
+| `version` | `1-84` | auto    | Symbol is `version * 2 + 21` modules square     |
+| `mask`    | `1-4`  | auto    | Mask pattern; chosen by evaluation when omitted |
 
-Automatically selects numeric, text or binary mode based on the input.
+Digit runs long enough to pay for the mode switch are compacted with numeric
+mode; everything else is encoded in byte mode as UTF-8. The standard's text and
+Chinese modes are size optimisations that etiket does not yet apply — a
+conforming reader accepts byte mode, but one that defaults to GB 18030 will not
+render non-ASCII text correctly.
 
 ## Stacked Symbologies
 
