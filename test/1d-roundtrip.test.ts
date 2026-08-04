@@ -10,11 +10,17 @@ import {
   encodeEAN13,
   encodeEAN8,
   encodeUPCA,
+  encodeUPCE,
   encodeCode39,
+  encodeCode39Extended,
   encodeCode93,
   encodeITF,
+  encodeITF14,
   encodeCodabar,
   encodeGS1128,
+  encodeGS1DataBarOmni,
+  encodeGS1DataBarLimited,
+  encodeGS1DataBarExpanded,
 } from "../src/index"
 
 /**
@@ -26,6 +32,7 @@ function barsToImageData(
   barWidth = 4,
   height = 100,
   margin = 40,
+  spaceFirst = false,
 ): { data: Uint8ClampedArray; width: number; height: number } {
   let totalModules = 0
   for (const w of bars) totalModules += w
@@ -36,7 +43,7 @@ function barsToImageData(
 
   // Draw bars
   let x = margin
-  let isBar = true
+  let isBar = !spaceFirst
   for (const w of bars) {
     if (isBar) {
       const barEnd = x + w * barWidth
@@ -64,6 +71,19 @@ async function decode1D(bars: number[]): Promise<string | null> {
   const img = barsToImageData(bars)
   const results = await readBarcodes(img as unknown as ImageData, { tryHarder: true })
   return results.length > 0 ? results[0]!.text : null
+}
+
+/**
+ * Decode a 1D barcode and return the symbology zxing detected alongside the text
+ */
+async function decode1DResult(
+  bars: number[],
+  options: { spaceFirst?: boolean; barWidth?: number } = {},
+): Promise<{ format: string; text: string } | null> {
+  const img = barsToImageData(bars, options.barWidth ?? 4, 100, 40, options.spaceFirst ?? false)
+  const results = await readBarcodes(img as unknown as ImageData, { tryHarder: true })
+  const first = results[0]
+  return first ? { format: first.format, text: first.text } : null
 }
 
 /**
@@ -153,5 +173,154 @@ describe("GS1-128 round-trip", () => {
   it("decodes AI format", async () => {
     const result = await decode1D(encodeGS1128("(01)12345678901231"))
     expect(result).toContain("12345678901231")
+  })
+})
+
+describe("UPC-E round-trip", () => {
+  // zxing reports UPC-E as its expanded 13-digit (EAN-13 style) equivalent
+  it("decodes UPC-E with an explicit check digit", async () => {
+    const result = await decode1DResult(encodeUPCE("01234565").bars)
+    expect(result).toEqual({ format: "UPCE", text: "0012345000065" })
+  })
+
+  it("decodes a code that expands through the manufacturer rule", async () => {
+    const result = await decode1DResult(encodeUPCE("04252614").bars)
+    expect(result).toEqual({ format: "UPCE", text: "0042100005264" })
+  })
+
+  it("decodes with an auto-computed check digit", async () => {
+    expect((await decode1DResult(encodeUPCE("1234567").bars))?.text).toBe("0123456000070")
+  })
+})
+
+describe("ITF-14 round-trip", () => {
+  it("decodes with an auto-computed check digit", async () => {
+    expect(await decode1D(encodeITF14("0012345678905"))).toBe("00123456789050")
+  })
+
+  it("decodes with an explicit check digit", async () => {
+    expect(await decode1D(encodeITF14("00123456789050"))).toBe("00123456789050")
+  })
+
+  it("is read back as an ITF symbol", async () => {
+    const result = await decode1DResult(encodeITF14("1234567890123"))
+    expect(result).toEqual({ format: "ITF", text: "12345678901231" })
+  })
+})
+
+describe("Code 39 Extended round-trip", () => {
+  it("decodes mixed case", async () => {
+    expect(await decode1D(encodeCode39Extended("Hello"))).toBe("Hello")
+  })
+
+  it("decodes punctuation", async () => {
+    expect(await decode1D(encodeCode39Extended("test@example.com"))).toBe("test@example.com")
+  })
+
+  it("decodes shifted symbol characters", async () => {
+    expect(await decode1D(encodeCode39Extended("a-b_c"))).toBe("a-b_c")
+  })
+
+  it("decodes control characters", async () => {
+    expect(await decode1D(encodeCode39Extended("Tab\tEnd"))).toBe("Tab\tEnd")
+  })
+
+  it("is read back as a Code 39 Extended symbol", async () => {
+    const result = await decode1DResult(encodeCode39Extended("Mixed42"))
+    expect(result).toEqual({ format: "Code39Ext", text: "Mixed42" })
+  })
+})
+
+/**
+ * Regression guard for #137: the SPACE entry of the Code 39 pattern table had two
+ * wide elements where every character must have exactly three, so any payload
+ * containing a space was unscannable.
+ */
+describe("Code 39 space character", () => {
+  it("decodes plain Code 39 containing a space", async () => {
+    expect(await decode1D(encodeCode39("HELLO WORLD"))).toBe("HELLO WORLD")
+  })
+
+  it("decodes Code 39 Extended containing a space", async () => {
+    expect(await decode1D(encodeCode39Extended("lower case"))).toBe("lower case")
+  })
+})
+
+/**
+ * GS1 DataBar round-trip.
+ *
+ * `encodeGS1DataBarOmni` / `Limited` / `Expanded` return element arrays whose first
+ * element is a SPACE. Every other 1D encoder in etiket — and `renderBarcodeSVG` /
+ * `renderBarcodePNG`, which both draw element 0 as a bar — assume bar-first, so the
+ * symbols etiket actually renders have inverted polarity and no reader accepts them.
+ * That is the `it.fails` case below; no issue is filed for it yet.
+ *
+ * Rendering the same arrays space-first reproduces, module for module, the pattern
+ * zxing's own DataBar writer emits, which is how the tests below verify that the
+ * Omnidirectional and Limited element widths themselves are correct.
+ */
+describe("GS1 DataBar round-trip", () => {
+  it.fails("decodes Omnidirectional as etiket renders it (bar-first)", async () => {
+    const result = await decode1DResult(encodeGS1DataBarOmni("01234567890128"))
+    expect(result?.text).toBe("(01)01234567890128")
+  })
+
+  it("decodes Omnidirectional when rendered space-first", async () => {
+    const result = await decode1DResult(encodeGS1DataBarOmni("01234567890128"), {
+      spaceFirst: true,
+    })
+    expect(result).toEqual({ format: "DataBarOmni", text: "(01)01234567890128" })
+  })
+
+  it("decodes a second Omnidirectional GTIN when rendered space-first", async () => {
+    const result = await decode1DResult(encodeGS1DataBarOmni("5901234123457"), {
+      spaceFirst: true,
+    })
+    expect(result?.text).toBe("(01)59012341234576")
+  })
+
+  it.fails("decodes Limited as etiket renders it (bar-first)", async () => {
+    const result = await decode1DResult(encodeGS1DataBarLimited("01234567890128"))
+    expect(result?.text).toBe("(01)01234567890128")
+  })
+
+  it("decodes Limited when rendered space-first", async () => {
+    const result = await decode1DResult(encodeGS1DataBarLimited("01234567890128"), {
+      spaceFirst: true,
+    })
+    expect(result).toEqual({ format: "DataBarLtd", text: "(01)01234567890128" })
+  })
+
+  it.fails("decodes Expanded as etiket renders it (bar-first)", async () => {
+    const result = await decode1DResult(encodeGS1DataBarExpanded("(01)90012345678908"))
+    expect(result?.text).toBe("(01)90012345678908")
+  })
+
+  it("produces a structurally valid Expanded symbol when rendered space-first", async () => {
+    const result = await decode1DResult(encodeGS1DataBarExpanded("(01)90012345678908"), {
+      spaceFirst: true,
+    })
+    expect(result?.format).toBe("DataBarExp")
+  })
+
+  /**
+   * Second, independent Expanded defect (also unfiled): even with the polarity
+   * corrected the payload comes back corrupted — `(01)90012345678908` decodes as
+   * `(01)40049382234908`, and `(10)ABC123` decodes as `10<GS>5308317`. The variable
+   * length symbol data is mis-packed, so the general-purpose encodation of AI data
+   * is wrong, independently of issue #113 (encodation methods 3-14).
+   */
+  it.fails("round-trips the Expanded payload when rendered space-first", async () => {
+    const result = await decode1DResult(encodeGS1DataBarExpanded("(01)90012345678908"), {
+      spaceFirst: true,
+    })
+    expect(result?.text).toBe("(01)90012345678908")
+  })
+
+  it.fails("round-trips a non-GTIN Expanded payload when rendered space-first", async () => {
+    const result = await decode1DResult(encodeGS1DataBarExpanded("(10)ABC123"), {
+      spaceFirst: true,
+    })
+    expect(result?.text).toContain("ABC123")
   })
 })

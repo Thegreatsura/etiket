@@ -164,3 +164,20 @@ describe("encodeCode39Extended", () => {
     expect(bars1).not.toEqual(bars2)
   })
 })
+
+describe("Code 39 pattern table", () => {
+  it("gives every character exactly three wide elements", async () => {
+    const { encodeCode39 } = await import("../src/index")
+    // Each character contributes 9 elements plus a 1-module gap
+    for (const ch of "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-. $/+%") {
+      const bars = encodeCode39(ch)
+      // strip start/stop (10 elements each) and the trailing gap
+      const pattern = bars.slice(10, 19)
+      expect(
+        pattern.filter((w) => w === 3),
+        `wide elements for "${ch}"`,
+      ).toHaveLength(3)
+      expect(pattern, `element count for "${ch}"`).toHaveLength(9)
+    }
+  })
+})
