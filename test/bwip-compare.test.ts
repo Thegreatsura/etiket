@@ -73,9 +73,10 @@ import {
  */
 const DIVERGENT: Record<string, string> = {
   micropdf417:
-    "#136 — symbol variant selection " +
-    "differs: etiket picks 1x11 where BWIPP picks 1x14 for the same data; where both pick " +
-    "the same variant the module pattern is identical",
+    "not a defect — etiket picks a smaller variant than BWIPP for the same data (1x11 vs " +
+    "1x14), and zxing decodes every one of these payloads from the smaller symbol; where " +
+    "both pick the same variant the module pattern is identical. Kept here so the " +
+    "difference stays visible rather than being silently asserted away (#136)",
 
   "gs1-composite":
     "#104 — etiket stuffs the literal AI text into a MicroPDF417 (11 x 54 modules); BWIPP " +
