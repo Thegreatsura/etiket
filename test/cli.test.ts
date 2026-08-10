@@ -89,6 +89,7 @@ describe("CLI — SVG output for every subcommand", () => {
     ["pdf417", ["pdf417", "HELLO"]],
     ["micropdf417", ["micropdf417", "HELLO"]],
     ["aztec", ["aztec", "HELLO"]],
+    ["aztecrune", ["aztecrune", "42"]],
     ["maxicode", ["maxicode", "HELLO"]],
     ["dotcode", ["dotcode", "HELLO"]],
     ["hanxin", ["hanxin", "HELLO"]],
@@ -121,6 +122,7 @@ describe("CLI — PNG output", () => {
     ["pdf417", ["pdf417", "HELLO"]],
     ["micropdf417", ["micropdf417", "HELLO"]],
     ["aztec", ["aztec", "HELLO"]],
+    ["aztecrune", ["aztecrune", "42"]],
     ["dotcode", ["dotcode", "HELLO"]],
     ["hanxin", ["hanxin", "HELLO"]],
     ["codablockf", ["codablockf", "HELLO"]],
@@ -201,6 +203,60 @@ describe("CLI — barcode options", () => {
     const svg = await runToFile(["barcode", "12345", "--type", "postnet"], "pn.svg")
     const heights = new Set([...svg.matchAll(/v([\d.]+)h-/g)].map((m) => m[1]))
     expect(heights.size).toBe(2)
+  })
+
+  it.each([
+    ["ean14", "1234567890123"],
+    ["sscc18", "10614141192837465"],
+    ["isbn", "978-0-306-40615-7"],
+    ["issn", "0317-8471"],
+    ["ismn", "M-2306-7118-7"],
+    ["code32", "12345678"],
+    ["pzn", "123456"],
+    ["pzn8", "1234567"],
+  ])("renders a %s", async (type, data) => {
+    expectSVG(await runToFile(["barcode", data, "--type", type], `${type}.svg`), type)
+  })
+
+  it.each([
+    ["industrial2of5", "1234567890"],
+    ["iata2of5", "1234567890"],
+    ["matrix2of5", "1234567890"],
+    ["coop2of5", "1234567890"],
+    ["datalogic2of5", "1234567890"],
+  ])("renders a %s", async (type, data) => {
+    expectSVG(await runToFile(["barcode", data, "--type", type], `${type}.svg`), type)
+  })
+
+  it("supports the Code 25 check digit flag", async () => {
+    const plain = await runToFile(["barcode", "12345", "--type", "matrix2of5"], "c25.svg")
+    const checked = await runToFile(
+      ["barcode", "12345", "--type", "matrix2of5", "--code25-check-digit", "add"],
+      "c25c.svg",
+    )
+    expect(plain).not.toBe(checked)
+  })
+
+  it("rejects an unknown Code 25 check digit mode", async () => {
+    expect(
+      await runExpectingFailure([
+        "barcode",
+        "12345",
+        "--type",
+        "matrix2of5",
+        "--code25-check-digit",
+        "maybe",
+      ]),
+    ).toBe(1)
+  })
+
+  it("supports the ISSN sequence variant", async () => {
+    const plain = await runToFile(["barcode", "0317-8471", "--type", "issn"], "issn0.svg")
+    const variant = await runToFile(
+      ["barcode", "0317-8471", "--type", "issn", "--issn-variant", "01"],
+      "issn1.svg",
+    )
+    expect(plain).not.toBe(variant)
   })
 })
 

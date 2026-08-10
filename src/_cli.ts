@@ -21,6 +21,7 @@ import {
   pdf417,
   micropdf417,
   aztec,
+  aztecrune,
   microqr,
   rmqr,
   maxicode,
@@ -47,6 +48,7 @@ import {
   pdf417PNG,
   micropdf417PNG,
   aztecPNG,
+  aztecrunePNG,
   microqrPNG,
   rmqrPNG,
   hanxinPNG,
@@ -64,6 +66,7 @@ import {
   gs1compositePNG,
   jabcodePNG,
 } from "./index"
+import { BARCODE_TYPES } from "./_types"
 import type { BarcodeType } from "./index"
 import type { PostalType } from "./_postal"
 import type {
@@ -78,37 +81,6 @@ import type { ErrorCorrectionLevel, QRCodeOptions } from "./encoders/qr/types"
 import type { DataMatrixShape } from "./encoders/datamatrix/tables"
 import { COMPOSITE_LINEAR_TYPES } from "./encoders/gs1-composite"
 import type { CompositeLinearType } from "./encoders/gs1-composite"
-
-/** Symbologies reachable through `etiket barcode`. */
-const BARCODE_TYPES: BarcodeType[] = [
-  "code128",
-  "ean13",
-  "ean8",
-  "code39",
-  "code39ext",
-  "code93",
-  "code93ext",
-  "itf",
-  "itf14",
-  "upca",
-  "upce",
-  "ean2",
-  "ean5",
-  "codabar",
-  "msi",
-  "pharmacode",
-  "code11",
-  "gs1-128",
-  "identcode",
-  "leitcode",
-  "postnet",
-  "planet",
-  "plessey",
-  "gs1-databar",
-  "gs1-databar-limited",
-  "gs1-databar-expanded",
-  "gs1-databar-truncated",
-]
 
 /** Symbologies reachable through `etiket postal`. */
 const POSTAL_TYPES: PostalType[] = [
@@ -131,6 +103,7 @@ const MATRIX_TYPES = [
   "pdf417",
   "micropdf417",
   "aztec",
+  "aztecrune",
   "maxicode",
   "dotcode",
   "hanxin",
@@ -646,6 +619,8 @@ interface BarcodeArgValues extends CommonArgValues {
   "codabar-start"?: string
   "codabar-stop"?: string
   "code128-charset"?: string
+  "issn-variant"?: string
+  "code25-check-digit"?: string
 }
 
 /** Barcode flags the PNG renderer cannot honour. */
@@ -696,9 +671,20 @@ const barcodeCommand = defineCommand({
     "codabar-start": { type: "string", description: "Codabar start character: A, B, C or D" },
     "codabar-stop": { type: "string", description: "Codabar stop character: A, B, C or D" },
     "code128-charset": { type: "string", description: "Code 128 charset: auto, A, B, C" },
+    "issn-variant": { type: "string", description: "ISSN sequence variant, two digits" },
+    "code25-check-digit": {
+      type: "string",
+      description: "Code 25 check digit: add or verify",
+    },
   },
   run({ args }) {
     const values = args as unknown as BarcodeArgValues & RawArgValues
+    const code25Check = choice(
+      values["code25-check-digit"],
+      ["add", "verify"] as const,
+      "code25-check-digit",
+    )
+    if (!code25Check.ok) return
     const encoding = {
       type: values.type as BarcodeType,
       msiCheckDigit: values["msi-check-digit"] as "mod10" | undefined,
@@ -706,6 +692,8 @@ const barcodeCommand = defineCommand({
       codabarStart: values["codabar-start"],
       codabarStop: values["codabar-stop"],
       code128Charset: values["code128-charset"] as "auto" | undefined,
+      issnVariant: values["issn-variant"],
+      code2of5CheckDigit: code25Check.value === "add" ? true : code25Check.value,
     }
     if (wantsPNG(values)) {
       warnIgnoredOnPNG(values, BARCODE_PNG_IGNORED)
@@ -1262,6 +1250,12 @@ export const main = defineCommand({
       png: micropdf417PNG,
     }),
     aztec: aztecCommand,
+    aztecrune: defineMatrixCommand({
+      name: "aztecrune",
+      description: "Generate an Aztec Rune (a value 0-255 in 11x11 modules)",
+      svg: (text, options) => aztecrune(Number(text), options),
+      png: (text, options) => aztecrunePNG(Number(text), options),
+    }),
     maxicode: defineMatrixCommand({
       name: "maxicode",
       description: "Generate a MaxiCode symbol",

@@ -34,6 +34,7 @@ import {
 import type { BwipState } from "./_bwip"
 import {
   encodeAustraliaPost,
+  encodeAztecRune,
   encodeCodabar,
   encodeCodablockF,
   encodeCode11,
@@ -43,8 +44,16 @@ import {
   encodeCode93,
   encodeDotCode,
   encodeEAN13,
+  encodeCode2of5,
+  encodeCode32,
+  encodeEAN14,
   encodeGS1128,
   encodeGS1Composite,
+  encodeISBN,
+  encodeISMN,
+  encodeISSN,
+  encodePZN,
+  encodeSSCC18,
   encodeHanXin,
   encodeHIBCPrimary,
   encodeIdentcode,
@@ -292,6 +301,87 @@ describe("bwip-js cross-verification: 1D", () => {
     bwip: (p) => bwipBars("gs1-128", p, { linkagec: true }),
   })
 
+  for (const [version, bcid] of [
+    ["industrial", "industrial2of5"],
+    ["iata", "iata2of5"],
+    ["matrix", "matrix2of5"],
+    ["coop", "coop2of5"],
+    ["datalogic", "datalogic2of5"],
+  ] as const) {
+    runLinear({
+      format: `code 25 (${version})`,
+      payloads: ["1234567890", "0", "00000", "9999999999", "12345"],
+      etiket: (p) => encodeCode2of5(p, { version }),
+      bwip: (p) => bwipBars(bcid, p),
+    })
+
+    runLinear({
+      format: `code 25 (${version}, check digit)`,
+      payloads: ["1234567890", "0", "12345"],
+      etiket: (p) => encodeCode2of5(p, { version, checkDigit: true }),
+      bwip: (p) => bwipBars(bcid, p, { includecheck: true }),
+    })
+  }
+
+  runLinear({
+    format: "ean14",
+    payloads: ["1234567890123", "0000000000000", "9876543210987"],
+    etiket: (p) => encodeEAN14(p),
+    bwip: (p) => bwipBars("ean14", `(01)${p}`),
+  })
+
+  runLinear({
+    format: "sscc18",
+    payloads: ["10614141192837465", "00000000000000000"],
+    etiket: (p) => encodeSSCC18(p),
+    bwip: (p) => bwipBars("sscc18", `(00)${p}`),
+  })
+
+  runLinear({
+    format: "isbn",
+    payloads: ["0-306-40615-2", "978-0-306-40615-7", "1-84356-028-3"],
+    etiket: (p) => encodeISBN(p).bars,
+    bwip: (p) => bwipBars("isbn", p),
+  })
+
+  runLinear({
+    format: "issn",
+    payloads: ["0317-8471", "1234-5679", "0035-7596"],
+    etiket: (p) => encodeISSN(p).bars,
+    bwip: (p) => bwipBars("issn", p),
+  })
+
+  runLinear({
+    format: "ismn",
+    payloads: ["M-2306-7118-7", "979-0-2306-7118-7"],
+    etiket: (p) => encodeISMN(p).bars,
+    bwip: (p) => bwipBars("ismn", p),
+  })
+
+  runLinear({
+    format: "code32",
+    payloads: ["12345678", "00000000", "99999999", "01234567"],
+    ratioAgnostic: true,
+    etiket: (p) => encodeCode32(p),
+    bwip: (p) => bwipBars("code32", p),
+  })
+
+  runLinear({
+    format: "pzn (PZN-7)",
+    payloads: ["123456", "000000", "111111", "234567"],
+    ratioAgnostic: true,
+    etiket: (p) => encodePZN(p),
+    bwip: (p) => bwipBars("pzn", p),
+  })
+
+  runLinear({
+    format: "pzn (PZN-8)",
+    payloads: ["1234567", "0000000", "2345678"],
+    ratioAgnostic: true,
+    etiket: (p) => encodePZN(p, { pzn8: true }),
+    bwip: (p) => bwipBars("pzn", p, { pzn8: true }),
+  })
+
   runLinear({
     format: "ean13",
     payloads: ["5901234123457", "4006381333931", "9780306406157"],
@@ -483,6 +573,22 @@ describe("bwip-js cross-verification: stacked and 2D", () => {
     // this comparison is about the module patterns, not the shape choice
     etiket: (p) => encodePDF417(p, { columns: 2, ecLevel: 2 }).matrix,
     bwip: (p) => bwipMatrix("pdf417", p, { columns: 2, eclevel: 2 }),
+  })
+
+  runMatrix({
+    // The right row indicator and the 18 module stop pattern give way to a
+    // single dark module, which nothing checked until now
+    format: "pdf417 (compact)",
+    payloads: ["HELLO", "PDF417 TEST", "123456789012"],
+    etiket: (p) => encodePDF417(p, { columns: 2, ecLevel: 2, compact: true }).matrix,
+    bwip: (p) => bwipMatrix("pdf417compact", p, { columns: 2, eclevel: 2 }),
+  })
+
+  runMatrix({
+    format: "aztec rune",
+    payloads: ["0", "1", "42", "128", "255"],
+    etiket: (p) => encodeAztecRune(Number(p)),
+    bwip: (p) => bwipMatrix("aztecrune", p),
   })
 
   runMatrix({

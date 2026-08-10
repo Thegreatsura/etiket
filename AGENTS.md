@@ -35,7 +35,10 @@ src/
     msi.ts                  # MSI Plessey (Mod10/11/1010/1110)
     pharmacode.ts           # Pharmacode
     code11.ts               # Code 11
-    gs1-128.ts              # GS1-128 (100+ AIs, FNC1, AI parsing)
+    gs1-128.ts              # GS1-128 (100+ AIs, FNC1, AI parsing), EAN-14, SSCC-18
+    isbn.ts                 # ISBN, ISSN, ISMN over EAN-13
+    pharma-national.ts      # Code 32 (Italian), PZN-7/PZN-8 (German), over Code 39
+    code2of5.ts             # Code 25: industrial, IATA, matrix, COOP, datalogic
     deutsche-post.ts        # Identcode, Leitcode
     postnet.ts              # USPS POSTNET, PLANET
     plessey.ts              # Plessey (UK library)
@@ -66,7 +69,7 @@ src/
       encoder.ts            # Text/Byte/Numeric compaction
       tables.ts             # Cluster patterns
       ec.ts                 # RS over GF(929)
-    aztec/                  # Aztec Code (ISO 24778)
+    aztec/                  # Aztec Code and Aztec Rune (ISO 24778)
       index.ts              # Main encoder
       encoder.ts            # 5-mode text + binary encoding
       tables.ts             # Mode tables, sizes
@@ -124,9 +127,12 @@ Single entry: `etiket` (everything). Sub-paths: `etiket/barcode`, `etiket/postal
 agree, that no subpath exports something the main entry lacks, and that shared
 symbols are the same object — so the surface cannot drift.
 
-1D + postal: `barcode()`, `encodeBars()`, `postal()`, `encodePostal()`.
+1D + postal: `barcode()`, `encodeBars()`, `postal()`, `encodePostal()`. 40
+width-modulated types, including the numbering schemes that ride on another
+symbology — `isbn`, `issn`, `ismn`, `ean14`, `sscc18`, `code32`, `pzn`, `pzn8` —
+and the discrete 2 of 5 family.
 
-2D: `qrcode()`, `microqr()`, `rmqr()`, `datamatrix()`, `gs1datamatrix()`, `pdf417()`, `micropdf417()`, `aztec()`, `maxicode()`, `dotcode()`, `hanxin()`, `codablockf()`, `code16k()`, `jabcode()`.
+2D: `qrcode()`, `microqr()`, `rmqr()`, `datamatrix()`, `gs1datamatrix()`, `pdf417()`, `micropdf417()`, `aztec()`, `aztecrune()`, `maxicode()`, `dotcode()`, `hanxin()`, `codablockf()`, `code16k()`, `jabcode()`.
 
 GS1: `gs1qr()`, `gs1composite()`, `encodeGS1CompositeSymbol()`, the DataBar
 family including the stacked variants. A composite symbol assembles over every
@@ -220,7 +226,7 @@ is known and turns red the moment it is fixed.
 
 v1. The full gate (`pnpm test`) is green:
 
-- **112 test files, 2900+ tests** passing
+- **116 test files, 3080+ tests** passing
 - **Zero** lint warnings, zero typecheck errors
 - **95.6%** statements, **91.6%** branches — thresholds enforced in CI by
   `vitest.config.ts`

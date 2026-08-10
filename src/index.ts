@@ -18,6 +18,7 @@ export {
   gs1datamatrix,
   pdf417,
   aztec,
+  aztecrune,
   microqr,
   rmqr,
   maxicode,
@@ -98,6 +99,13 @@ export { encodePharmacode } from "./encoders/pharmacode"
 export { encodeCode11 } from "./encoders/code11"
 export { encodeGS1128 } from "./encoders/gs1-128"
 export type { GS1128Options, GS1128Linkage } from "./encoders/gs1-128"
+export { encodeEAN14, encodeSSCC18 } from "./encoders/gs1-128"
+export { encodeISBN, encodeISSN, encodeISMN } from "./encoders/isbn"
+export type { ISSNOptions } from "./encoders/isbn"
+export { encodeCode32, encodePZN } from "./encoders/pharma-national"
+export type { PZNOptions } from "./encoders/pharma-national"
+export { encodeCode2of5 } from "./encoders/code2of5"
+export type { Code2of5Options, Code2of5Version } from "./encoders/code2of5"
 export { encodeIdentcode, encodeLeitcode } from "./encoders/deutsche-post"
 export { encodePOSTNET, encodePLANET } from "./encoders/postnet"
 export { encodePlessey } from "./encoders/plessey"
@@ -149,7 +157,7 @@ export type {
 export type { PDF417Options } from "./encoders/pdf417/index"
 export { encodeMicroPDF417 } from "./encoders/micropdf417"
 export type { MicroPDF417Options } from "./encoders/micropdf417"
-export { encodeAztec } from "./encoders/aztec/index"
+export { encodeAztec, encodeAztecRune } from "./encoders/aztec/index"
 export type { AztecOptions } from "./encoders/aztec/index"
 export { encodeHIBCPrimary, encodeHIBCSecondary, encodeHIBCConcatenated } from "./encoders/hibc"
 export {
@@ -174,6 +182,8 @@ export {
   pdf417PNGDataURI,
   aztecPNG,
   aztecPNGDataURI,
+  aztecrunePNG,
+  aztecrunePNGDataURI,
   postalPNG,
   postalPNGDataURI,
   microqrPNG,
