@@ -308,7 +308,7 @@ export interface AztecSize {
 const WORD_SIZE: readonly number[] = [
   4,  6,  6,  8,  8,  8,  8,  8,  8, 10, 10, 10, 10, 10, 10, 10, 10,
   10, 10, 10, 10, 10, 10, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
-];
+]
 
 /**
  * Compute the codeword size for a given number of layers.

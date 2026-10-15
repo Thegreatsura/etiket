@@ -6,13 +6,13 @@ this project: how symbologies are verified, and what the code has to look like.
 ## Getting started
 
 ```sh
-pnpm install
-pnpm test        # lint + typecheck + the whole suite
-pnpm dev         # vitest in watch mode
-pnpm build       # obuild
+bun install
+bun run test           # lint + typecheck + the whole suite
+bun run dev            # vitest in watch mode
+bun run build          # obuild
 ```
 
-`pnpm test` is the gate. It must be green before a pull request is ready.
+`bun run test` is the gate. It must be green before a pull request is ready.
 
 ## The one rule that matters: verify against something else
 
@@ -59,8 +59,8 @@ decoded as Shift-JIS when you meant Latin-1. Compare the decoded **bytes** —
 - Pure ESM, no CJS.
 - **Zero runtime dependencies.** The CLI's dependencies are bundled into
   `dist/cli.mjs` by a separate build entry; nothing else may import a package.
-- TypeScript strict. `pnpm typecheck` runs `tsc --noEmit`.
-- Formatting is oxfmt: double quotes, no semicolons. Run `pnpm lint:fix`.
+- TypeScript strict. `bun run typecheck` runs `tsc --noEmit`.
+- Formatting is oxfmt: double quotes, no semicolons. Run `bun run lint:fix`.
 - Linting is oxlint. Zero warnings.
 - Tests live flat in `test/`, named after what they cover.
 - Internal modules are prefixed with `_`.

@@ -108,7 +108,7 @@ const EC_COEFFICIENTS: readonly (readonly number[])[] = [
     407, 164, 332, 899, 165, 726, 600, 325, 498, 655, 357, 752, 768, 223, 849, 647,
     63, 310, 863, 251, 366, 304, 282, 738, 675, 410, 389, 244, 31, 121, 303, 263,
   ],
-];
+]
 
 /**
  * Generate error correction codewords for PDF417 data.

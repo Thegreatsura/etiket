@@ -81,7 +81,7 @@ const BAR_TABLE: [number, number, number, number][] = [
   [2,  9,   9,  0],  // bar 63: C 9  J 0
   [6,  8,   5,  3],  // bar 64: G 8  F 3
   [3, 10,   8,  2],  // bar 65: D 10 I 2
-];
+]
 
 /**
  * Build the N-of-13 lookup table used to convert codewords to characters.

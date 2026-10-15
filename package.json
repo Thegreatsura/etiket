@@ -46,6 +46,9 @@
   "bin": {
     "etiket": "./dist/cli.mjs"
   },
+  "workspaces": [
+    "web"
+  ],
   "files": [
     "dist",
     "CHANGELOG.md"
@@ -111,29 +114,29 @@
     "lint": "oxlint . && oxfmt --check .",
     "lint:fix": "oxlint . --fix && oxfmt .",
     "fmt": "oxfmt .",
-    "test": "pnpm lint && pnpm typecheck && vitest run",
+    "test": "bun run lint && bun run typecheck && vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "docs:dev": "npx mdzilla ./docs",
-    "release": "pnpm test && pnpm build && bumpp --commit --tag --push --all",
-    "prepack": "pnpm build"
+    "release": "bun run test && bun run build && bumpp --commit --tag --push --all",
+    "prepack": "bun run build"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^4.1.10",
-    "bumpp": "^12.1.1",
-    "bwip-js": "^4.11.2",
+    "@vitest/coverage-v8": "^5.0.4",
+    "bumpp": "^12.3.0",
+    "bwip-js": "^4.11.4",
     "citty": "^0.2.2",
     "consola": "^3.4.2",
     "jsqr": "^1.4.0",
-    "obuild": "^0.4.38",
-    "oxfmt": "^0.61.0",
-    "oxlint": "^1.76.0",
+    "obuild": "^0.4.45",
+    "oxfmt": "^0.73.0",
+    "oxlint": "^1.88.0",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.10",
-    "zxing-wasm": "^3.1.2"
+    "vitest": "^5.0.4",
+    "zxing-wasm": "^3.1.5"
   },
   "engines": {
     "node": ">=24"
   },
-  "packageManager": "pnpm@11.20.0"
+  "packageManager": "bun@1.4.3"
 }

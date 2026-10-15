@@ -25,7 +25,7 @@ const RMQR_SIZES: [number, number, number, number, number, number][] = [
   [13,27,12,7,9,14],[13,43,27,13,14,28],[13,59,38,20,22,40],[13,77,53,29,32,56],[13,99,73,35,40,78],[13,139,106,54,60,112],
   [15,43,33,15,18,36],[15,59,48,26,26,48],[15,77,67,31,36,72],[15,99,88,48,48,88],[15,139,127,69,72,130],
   [17,43,39,21,22,40],[17,59,56,28,32,60],[17,77,78,38,44,84],[17,99,100,56,60,104],[17,139,152,76,80,156],
-];
+]
 
 // Reed-Solomon block counts per version index (ISO/IEC 23941 Table 13).
 // Each entry: [M group1 blocks, M group2 blocks, H group1 blocks, H group2 blocks].
@@ -39,7 +39,7 @@ const RMQR_BLOCKS: [number, number, number, number][] = [
   [1,0,1,0],[1,0,1,0],[1,0,2,0],[1,1,1,1],[1,1,1,2],[2,1,2,2], // R13x27 .. R13x139
   [1,0,1,1],[1,0,2,0],[1,1,2,1],[2,0,4,0],[2,1,1,4],           // R15x43 .. R15x139
   [1,0,1,1],[2,0,2,0],[2,0,1,2],[2,1,4,0],[4,0,2,4],           // R17x43 .. R17x139
-];
+]
 
 // rMQR mode indicators (3 bits each, per ISO/IEC 23941)
 const RMQR_MODE_NUMERIC = 0b001
@@ -120,7 +120,7 @@ const RMQR_FORMAT_LEFT: number[] = [
   0x376db,0x369fe,0x357b4,0x34891,0x33405,0x32b20,0x3156a,0x30a4f,
   0x2f81f,0x2e73a,0x2d970,0x2c655,0x2bac1,0x2a5e4,0x29bae,0x2848b,
   0x27da3,0x26286,0x25ccc,0x243e9,0x23f7d,0x22058,0x21e12,0x20137,
-];
+]
 // prettier-ignore
 const RMQR_FORMAT_RIGHT: number[] = [
   0x20a7b,0x2155e,0x22b14,0x23431,0x248a5,0x25780,0x269ca,0x276ef,
@@ -131,7 +131,7 @@ const RMQR_FORMAT_RIGHT: number[] = [
   0x08612,0x09937,0x0a77d,0x0b858,0x0c4cc,0x0dbe9,0x0e5a3,0x0fa86,
   0x108d6,0x117f3,0x129b9,0x1369c,0x14a08,0x1552d,0x16b67,0x17442,
   0x18d6a,0x1924f,0x1ac05,0x1b320,0x1cfb4,0x1d091,0x1eedb,0x1f1fe,
-];
+]
 
 export interface RMQROptions {
   ecLevel?: "M" | "H"
@@ -338,7 +338,7 @@ export function encodeRMQR(text: string, options: RMQROptions = {}): boolean[][]
   // prettier-ignore
   const SUB_ALIGN: number[][] = [
     [21], [19,39], [25,51], [23,49,75], [27,55,83,111],
-  ];
+  ]
   if (widthGroupIdx >= 0) {
     for (const ac of SUB_ALIGN[widthGroupIdx]!) {
       // Vertical timing column

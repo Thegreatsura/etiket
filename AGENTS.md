@@ -102,7 +102,7 @@ src/
     barcode.ts              # Per-format validation
     qr.ts                   # QR validation with metadata
 test/
-  *.test.ts                 # 140 test files, 3520+ tests
+  *.test.ts                 # 141 test files, 3530+ tests
   _bwip.ts                  # bwip-js (BWIPP) oracle: module data extraction
   bwip-compare.test.ts      # Module-for-module comparison against BWIPP
   qr-roundtrip.test.ts      # QR encode→decode via jsQR (all versions, EC, masks)
@@ -166,15 +166,15 @@ PNG: `barcodePNG()`, `postalPNG()`, `qrcodePNG()`, `microqrPNG()`, `rmqrPNG()`, 
 ## Build & Scripts
 
 ```bash
-pnpm build          # obuild (rolldown)
-pnpm dev            # vitest watch
-pnpm lint           # oxlint + oxfmt --check
-pnpm lint:fix       # oxlint --fix + oxfmt
-pnpm fmt            # oxfmt
-pnpm test           # pnpm lint && pnpm typecheck && vitest run
-pnpm typecheck      # tsc --noEmit
-pnpm release        # pnpm test && pnpm build && changelogen --release && npm publish && git push --follow-tags
-pnpm docs:dev       # npx mdzilla ./docs
+bun run build          # obuild (rolldown)
+bun run dev            # vitest watch
+bun run lint           # oxlint + oxfmt --check
+bun run lint:fix       # oxlint --fix + oxfmt
+bun run fmt            # oxfmt
+bun run test           # bun run lint && bun run typecheck && vitest run
+bun run typecheck      # tsc --noEmit
+bun run release        # bun run test && bun run build && bumpp --commit --tag --push --all
+bun run docs:dev       # npx mdzilla ./docs
 ```
 
 ## Code Conventions
@@ -204,9 +204,9 @@ pnpm docs:dev       # npx mdzilla ./docs
 - **Reference comparison:** bwip-js (BWIPP) for the formats no decoder
   implements — see `test/_bwip.ts` and `test/bwip-compare.test.ts`
 - **Dev dependencies for testing:** `jsqr`, `zxing-wasm`, `bwip-js`
-- Run all: `pnpm test` (lint + typecheck + vitest)
-- Run single: `pnpm vitest run test/<file>.test.ts`
-- Coverage: `pnpm vitest run --coverage`
+- Run all: `bun run test` (lint + typecheck + vitest)
+- Run single: `bunx vitest run test/<file>.test.ts`
+- Coverage: `bunx vitest run --coverage`
 
 ### Testing Notes
 
@@ -245,9 +245,9 @@ is known and turns red the moment it is fixed.
 
 ## Project Status
 
-v1. The full gate (`pnpm test`) is green:
+v1. The full gate (`bun run test`) is green:
 
-- **140 test files, 3520+ tests** passing
+- **141 test files, 3530+ tests** passing
 - **Zero** lint warnings, zero typecheck errors
 - **96.8%** statements, **93.2%** branches — thresholds enforced in CI by
   `vitest.config.ts`

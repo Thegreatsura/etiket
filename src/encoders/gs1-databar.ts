@@ -461,7 +461,7 @@ const LTD_FINDER_PATTERN = [
   [2,1,1,1,1,1,1,3,1,1,2,1,1,1],[2,1,1,1,1,2,1,1,1,2,2,1,1,1],
   [2,1,1,1,1,2,1,2,1,1,2,1,1,1],[2,1,1,2,1,1,1,1,1,2,2,1,1,1],
   [2,1,1,1,1,1,1,1,2,2,1,2,1,1],
-];
+]
 
 /** Determine group index for a Limited data pair value (modifies val in place) */
 function ltdGroup(pairVal: number): { group: number; adjustedVal: number } {
@@ -576,7 +576,7 @@ const EXP_CHECKSUM_WEIGHT = [
   [79,26,78,23,69,207,199,175],[103,98,83,38,114,131,182,124],
   [161,61,183,127,170,88,53,159],[55,165,73,8,24,72,5,15],
   [45,135,194,160,58,174,100,89],
-];
+]
 
 // Table 15: Finder patterns for Expanded (12 patterns x 5 elements)
 const EXP_FINDER_PATTERN = [
@@ -622,7 +622,7 @@ const EXP_WEIGHT_ROWS: number[][] = [
   [0,1,2,3,4,5,6,7,8,9,10,11,12,17,18,15,16],
   [0,1,2,3,4,5,6,7,8,9,10,11,12,17,18,19,20,21,22],
   [0,1,2,3,4,5,6,7,8,13,14,11,12,17,18,15,16,21,22,19,20],
-];
+]
 
 /** Determine group index for an Expanded data character value */
 function expGroup(val: number): number {

@@ -351,10 +351,8 @@ import { encode } from "etiket"
 
 const result = encode("Hello", { type: "qr", qr: { ecLevel: "H" } })
 
-if (result.type === "1d")
-  result.bars // bar/space widths
-else if (result.type === "2d")
-  result.matrix // boolean[][]
+if (result.type === "1d") result.bars // bar/space widths
+else if (result.type === "2d") result.matrix // boolean[][]
 else result.bars // postal bar states
 ```
 
@@ -763,10 +761,10 @@ Contributions are welcome! Here are some areas where help is especially apprecia
 - Documentation improvements
 
 ```bash
-pnpm install    # Install dependencies
-pnpm dev        # Run tests in watch mode
-pnpm test       # Lint + typecheck + test
-pnpm build      # Build for production
+bun install            # Install dependencies
+bun run dev            # Run tests in watch mode
+bun run test           # Lint + typecheck + test
+bun run build          # Build for production
 ```
 
 ## License
