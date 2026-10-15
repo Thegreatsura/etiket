@@ -35,6 +35,32 @@ import { encodeQR } from "etiket"
 encodeQR("漢字テスト", { mode: "kanji" })
 ```
 
+## Leaving the Table Out
+
+The Shift-JIS table is about 84 KB minified, 30 KB gzipped — most of what the QR
+encoder weighs. `encodeQR` and `qrcode` carry it. `encodeQRCore` is the same
+encoder without it: a bundle that imports only `encodeQRCore` never ships the
+table, and Japanese text goes out in byte mode as UTF-8, which every common
+reader decodes, at nearly twice the bits per character.
+
+```ts
+import { encodeQRCore } from "etiket/qr"
+
+encodeQRCore("https://example.com") // the same matrix encodeQR returns
+encodeQRCore("漢字テスト") // byte mode, UTF-8
+```
+
+Hand it the table and it is `encodeQR` again — for an app that loads the table
+only on the pages that need it:
+
+```ts
+import { encodeQRCore, kanjiCodec } from "etiket/qr"
+
+encodeQRCore("漢字テスト", { kanji: kanjiCodec }) // kanji mode
+```
+
+`mode: "kanji"` without a codec throws `InvalidInputError`.
+
 ## Coverage
 
 The table covers the two byte ranges kanji mode allows:

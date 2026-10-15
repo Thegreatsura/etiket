@@ -119,6 +119,7 @@ void everything
 | `MailmarkType`         | `7 \| 9 \| 29` — the Royal Mail barcode types                                 |
 | `MailmarkOptions`      | `{ type?: MailmarkType }`                                                     |
 | `QRSequenceOptions`    | `QRCodeOptions` minus `structuredAppend`, plus `symbols`                      |
+| `KanjiCodec`           | `{ toShiftJIS(char) }` — the table kanji mode encodes with (`kanjiCodec`)     |
 
 ```ts
 import type { QRCodeOptions, QRCodeSVGOptions, ErrorCorrectionLevel, EncodingMode } from "etiket"

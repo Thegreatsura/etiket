@@ -10,10 +10,16 @@
 export { qrcode, qrcodeTerminal, qrcodeDataURI, qrcodeBase64 } from "./_qrcode"
 export { microqr, rmqr } from "./_2d"
 export type { QRCodeSVGOptions } from "./renderers/svg/types"
-export type { QRCodeOptions, ErrorCorrectionLevel, EncodingMode } from "./encoders/qr/types"
+export type {
+  QRCodeOptions,
+  ErrorCorrectionLevel,
+  EncodingMode,
+  KanjiCodec,
+} from "./encoders/qr/types"
 export type { DotType, GradientOptions, CornerOptions, LogoOptions } from "./renderers/svg/types"
 
-export { encodeQR, encodeQRSequence } from "./encoders/qr/index"
+export { encodeQR, encodeQRCore, encodeQRSequence } from "./encoders/qr/index"
+export { kanjiCodec } from "./encoders/qr/kanji"
 export type { QRSequenceOptions } from "./encoders/qr/index"
 export { encodeMicroQR } from "./encoders/qr/micro"
 export type { MicroQROptions } from "./encoders/qr/micro"

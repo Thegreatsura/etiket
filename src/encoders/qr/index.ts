@@ -8,6 +8,7 @@ import { encodeData } from "./data"
 import { createMatrix, placeFunctionPatterns, placeData } from "./matrix"
 import { selectBestMask, applyMask } from "./mask"
 import { writeFormatInfo, writeVersionInfo } from "./format"
+import { kanjiCodec } from "./kanji"
 import { CapacityError, InvalidInputError } from "../../errors"
 
 export type { QRCodeOptions, ErrorCorrectionLevel, EncodingMode, QRSegment } from "./types"
@@ -17,6 +18,14 @@ export type { QRCodeOptions, ErrorCorrectionLevel, EncodingMode, QRSegment } fro
  * Returns a 2D boolean array (true = dark module)
  */
 export function encodeQR(text: string, options: QRCodeOptions = {}): boolean[][] {
+  return encodeQRCore(text, { ...options, kanji: options.kanji ?? kanjiCodec })
+}
+
+/**
+ * Encode text as a QR code matrix without the Shift-JIS table, so a bundle
+ * that uses only this never ships it. Kanji mode needs `options.kanji`.
+ */
+export function encodeQRCore(text: string, options: QRCodeOptions = {}): boolean[][] {
   if (text.length === 0) {
     throw new InvalidInputError("QR Code input must not be empty")
   }

@@ -5,6 +5,7 @@
 import type { ErrorCorrectionLevel } from "../encoders/qr/types"
 import { planEncoding } from "../encoders/qr/data"
 import { detectMode } from "../encoders/qr/mode"
+import { kanjiCodec } from "../encoders/qr/kanji"
 
 /** Maximum data capacity by EC level and mode (version 40) */
 const MAX_CAPACITY: Record<ErrorCorrectionLevel, Record<string, number>> = {
@@ -37,7 +38,7 @@ export function validateQRInput(
   }
 
   // Detect mode
-  const mode = detectMode(text)
+  const mode = detectMode(text, kanjiCodec)
 
   const caps = MAX_CAPACITY[ecLevel]
   const maxCapacity = caps[mode]!
@@ -64,7 +65,7 @@ export function validateQRInput(
   // the version the caller will actually get — including multi-segment splits
   let version: number
   try {
-    version = planEncoding(text, ecLevel, {}).version
+    version = planEncoding(text, ecLevel, { kanji: kanjiCodec }).version
   } catch {
     return {
       valid: false,

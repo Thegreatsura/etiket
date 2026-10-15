@@ -705,6 +705,7 @@ or `"numeric"` (2 bars per digit).
 | :-------------------------------------- | :------------------------------------------ |
 | `encodeQR(text, options?)`              | `boolean[][]`                               |
 | `encodeQRSequence(text, options?)`      | `boolean[][][]`                             |
+| `encodeQRCore(text, options?)`          | `boolean[][]` — no kanji table of its own   |
 | `encodeMicroQR(text, options?)`         | `boolean[][]`                               |
 | `encodeRMQR(text, options?)`            | `boolean[][]`                               |
 | `encodeDataMatrix(text, options?)`      | `boolean[][]`                               |
@@ -728,6 +729,8 @@ or `"numeric"` (2 bars per digit).
 import {
   encodeQR,
   encodeQRSequence,
+  encodeQRCore,
+  kanjiCodec,
   encodeMicroQR,
   encodeRMQR,
   encodeDataMatrix,
@@ -750,6 +753,8 @@ import {
 
 encodeQR("Hello", { ecLevel: "H", mode: "byte" }).length // 21 for version 1
 encodeQRSequence("A".repeat(200), { symbols: 3 }).length // 3
+encodeQRCore("https://example.com") // the same matrix as encodeQR, without the Shift-JIS table
+encodeQRCore("日本語", { kanji: kanjiCodec }) // kanji mode, when the table is wanted after all
 encodeMicroQR("12345", { version: 2, ecLevel: "L" })
 encodeRMQR("Hello", { ecLevel: "M" })
 encodeDataMatrix("Hello", { shape: "auto", dmre: true })

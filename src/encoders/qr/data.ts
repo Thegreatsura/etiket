@@ -2,7 +2,7 @@
  * QR Code data encoding and bitstream construction
  */
 
-import type { ErrorCorrectionLevel, QRCodeOptions, QRSegment } from "./types"
+import type { ErrorCorrectionLevel, KanjiCodec, QRCodeOptions, QRSegment } from "./types"
 import { MODE_INDICATOR } from "./types"
 import { getECInfo, getCharCountBits } from "./tables"
 import { getDataCapacityBits, selectMode } from "./version"
@@ -94,8 +94,15 @@ export function planEncoding(
     )
   }
 
+  // Checked before capacity, which would otherwise answer for a long text
+  if (forcedMode === "kanji" && !options.kanji) {
+    throw new InvalidInputError(
+      "QR kanji mode needs the Shift-JIS table: use encodeQR, or pass { kanji: kanjiCodec } to encodeQRCore",
+    )
+  }
+
   if (options.version !== undefined) {
-    const segments = segmentsFor(payload, options.version, forcedMode)
+    const segments = segmentsFor(payload, options.version, forcedMode, options.kanji)
     const needed = headerBits(options) + totalBits(segments, options.version)
     const capacity = getDataCapacityBits(options.version, ecLevel)
     if (needed > capacity) {
@@ -113,7 +120,7 @@ export function planEncoding(
     const group = version < 10 ? 0 : version < 27 ? 1 : 2
     let segments = byGroup.get(group)
     if (!segments) {
-      segments = segmentsFor(payload, version, forcedMode)
+      segments = segmentsFor(payload, version, forcedMode, options.kanji)
       byGroup.set(group, segments)
     }
     if (
@@ -128,7 +135,12 @@ export function planEncoding(
 }
 
 /** Split the text into segments, or a single segment when the mode is forced */
-function segmentsFor(text: string, version: number, forcedMode?: string): QRSegment[] {
+function segmentsFor(
+  text: string,
+  version: number,
+  forcedMode?: string,
+  kanji?: KanjiCodec,
+): QRSegment[] {
   if (forcedMode) {
     const mode = selectMode(text, forcedMode)
     const data = new TextEncoder().encode(text)
@@ -137,7 +149,7 @@ function segmentsFor(text: string, version: number, forcedMode?: string): QRSegm
       ? [{ mode, data, charCount: data.length }]
       : [{ mode, data: text, charCount: text.length }]
   }
-  return optimizeSegments(text, version)
+  return optimizeSegments(text, version, undefined, kanji)
 }
 
 /** Header + payload bits for a whole segment list */
@@ -175,7 +187,7 @@ function buildDataBits(
   appendHeaders(bits, options)
 
   for (const segment of segments) {
-    appendSegment(bits, segment, version)
+    appendSegment(bits, segment, version, options.kanji)
   }
 
   // Terminator
@@ -283,7 +295,12 @@ function applicationIndicatorValue(indicator: string): number {
 }
 
 /** Append one segment's mode indicator, character count and payload */
-function appendSegment(bits: number[], segment: QRSegment, version: number): void {
+function appendSegment(
+  bits: number[],
+  segment: QRSegment,
+  version: number,
+  kanji?: KanjiCodec,
+): void {
   const mode = segment.mode
   if (mode === "eci") {
     throw new EtiketError("Internal: ECI segments are emitted as headers, not as data segments")
@@ -303,7 +320,7 @@ function appendSegment(bits: number[], segment: QRSegment, version: number): voi
       bits.push(...encodeByteData(asBytes(segment.data)))
       break
     case "kanji":
-      bits.push(...encodeKanjiData(unicodeToShiftJIS(asText(segment.data))))
+      bits.push(...encodeKanjiData(unicodeToShiftJIS(asText(segment.data), kanji!)))
       break
   }
 }

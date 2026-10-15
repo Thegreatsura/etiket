@@ -106,6 +106,7 @@ test/
   _bwip.ts                  # bwip-js (BWIPP) oracle: module data extraction
   bwip-compare.test.ts      # Module-for-module comparison against BWIPP
   qr-roundtrip.test.ts      # QR encode→decode via jsQR (all versions, EC, masks)
+  encoders-qr-core.test.ts  # encodeQRCore: encodeQR without the kanji table
   2d-roundtrip.test.ts      # 2D decode verification via zxing-wasm
   1d-roundtrip.test.ts      # 1D decode verification via zxing-wasm
   encoders-modes-roundtrip.test.ts # Encoder mode coverage, decoded with zxing

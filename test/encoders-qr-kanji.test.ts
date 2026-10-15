@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { encodeKanjiData, unicodeToShiftJIS } from "../src/encoders/qr/mode"
+import { kanjiCodec } from "../src/encoders/qr/kanji"
 import { encodeQR } from "../src/encoders/qr/index"
 
 describe("Kanji encoding", () => {
@@ -17,13 +18,13 @@ describe("Kanji encoding", () => {
 
   it("unicodeToShiftJIS converts CJK characters", () => {
     // U+3042 (あ) should map to SJIS range
-    const values = unicodeToShiftJIS("あ")
+    const values = unicodeToShiftJIS("あ", kanjiCodec)
     expect(values.length).toBe(1)
     expect(values[0]).toBeGreaterThanOrEqual(0x8140)
   })
 
   it("unicodeToShiftJIS throws for non-CJK", () => {
-    expect(() => unicodeToShiftJIS("A")).toThrow()
+    expect(() => unicodeToShiftJIS("A", kanjiCodec)).toThrow()
   })
 
   it("encodeQR with kanji mode produces valid matrix", () => {

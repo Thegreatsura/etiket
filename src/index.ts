@@ -67,7 +67,7 @@ export type {
   EncodePostalResult,
 } from "./_types"
 export type { BarcodeSVGOptions, QRCodeSVGOptions } from "./renderers/svg/types"
-export type { QRCodeOptions } from "./encoders/qr/types"
+export type { QRCodeOptions, KanjiCodec } from "./encoders/qr/types"
 export type {
   DotType,
   GradientOptions,
@@ -84,7 +84,8 @@ export type { ErrorCorrectionLevel, EncodingMode } from "./encoders/qr/types"
 export { encodeCode128 } from "./encoders/code128"
 export type { Code128Charset, Code128Options } from "./encoders/code128"
 export { encodeEAN13, encodeEAN8 } from "./encoders/ean"
-export { encodeQR, encodeQRSequence } from "./encoders/qr/index"
+export { encodeQR, encodeQRCore, encodeQRSequence } from "./encoders/qr/index"
+export { kanjiCodec } from "./encoders/qr/kanji"
 export type { QRSequenceOptions } from "./encoders/qr/index"
 export { encodeMicroQR } from "./encoders/qr/micro"
 export type { MicroQROptions } from "./encoders/qr/micro"

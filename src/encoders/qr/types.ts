@@ -43,6 +43,17 @@ export interface QRCodeOptions {
    * data follows. Ignored when `gs1` is set.
    */
   applicationIndicator?: string
+  /**
+   * The Shift-JIS table for kanji mode. `encodeQR` passes `kanjiCodec`;
+   * without it, `encodeQRCore` encodes Japanese text in byte mode.
+   */
+  kanji?: KanjiCodec
+}
+
+/** The Unicode to Shift-JIS mapping kanji mode encodes with, as `kanjiCodec` */
+export interface KanjiCodec {
+  /** The Shift-JIS value kanji mode encodes a character as, or undefined when it cannot */
+  toShiftJIS(char: string): number | undefined
 }
 
 export interface QRSegment {

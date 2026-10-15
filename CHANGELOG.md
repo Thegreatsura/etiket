@@ -92,6 +92,11 @@ work found a lot of confidently wrong output.
 - **JAB Code PNG output**, and an explicit note that the encoder is not ISO/IEC
   23634 conformant and cannot be verified
   ([#103](https://github.com/productdevbook/etiket/issues/103))
+- **`encodeQRCore()`**, the QR encoder without the Shift-JIS table. The table
+  is most of the encoder's weight — 43.6 KB gzipped against 7.9 KB without it —
+  and a bundle that imports only `encodeQRCore` never ships it; Japanese text
+  then goes out in byte mode as UTF-8. Pass `{ kanji: kanjiCodec }` and it is
+  `encodeQR` again. `encodeQR` and `qrcode` are unchanged.
 
 ### API
 

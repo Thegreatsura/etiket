@@ -10,7 +10,13 @@ import { describe, expect, it } from "vitest"
 import { readBarcodes } from "zxing-wasm/reader"
 import { encodeQR } from "../src/index"
 import { planEncoding } from "../src/encoders/qr/data"
-import { fromShiftJIS, isKanjiChar, toShiftJIS, KANJI_CHAR_COUNT } from "../src/encoders/qr/kanji"
+import {
+  fromShiftJIS,
+  isKanjiChar,
+  kanjiCodec,
+  toShiftJIS,
+  KANJI_CHAR_COUNT,
+} from "../src/encoders/qr/kanji"
 import { isKanji, detectMode, unicodeToShiftJIS } from "../src/encoders/qr/mode"
 
 function matrixToImageData(matrix: boolean[][], scale = 6, margin = 6) {
@@ -73,21 +79,21 @@ describe("Shift-JIS table", () => {
   })
 
   it("throws a message naming the character it cannot encode", () => {
-    expect(() => unicodeToShiftJIS("日😀")).toThrow(/U\+1F600.*kanji mode/)
+    expect(() => unicodeToShiftJIS("日😀", kanjiCodec)).toThrow(/U\+1F600.*kanji mode/)
   })
 })
 
 describe("kanji detection", () => {
   it("recognises Japanese text", () => {
-    expect(isKanji("日本語")).toBe(true)
-    expect(isKanji("こんにちは")).toBe(true)
-    expect(detectMode("日本語")).toBe("kanji")
+    expect(isKanji("日本語", kanjiCodec)).toBe(true)
+    expect(isKanji("こんにちは", kanjiCodec)).toBe(true)
+    expect(detectMode("日本語", kanjiCodec)).toBe("kanji")
   })
 
   it("does not claim text it cannot encode", () => {
-    expect(isKanji("日本語A")).toBe(false)
-    expect(isKanji("")).toBe(false)
-    expect(detectMode("hello")).toBe("byte")
+    expect(isKanji("日本語A", kanjiCodec)).toBe(false)
+    expect(isKanji("", kanjiCodec)).toBe(false)
+    expect(detectMode("hello", kanjiCodec)).toBe("byte")
   })
 })
 
@@ -112,13 +118,13 @@ describe("kanji round-trip (zxing-wasm)", () => {
 describe("kanji mode pays for itself", () => {
   it("produces a smaller symbol than byte mode", () => {
     const text = "日本語のテキストをできるだけ小さなシンボルに収めたい"
-    const kanji = planEncoding(text, "M", {}).version
+    const kanji = planEncoding(text, "M", { kanji: kanjiCodec }).version
     const bytes = planEncoding(text, "M", { mode: "byte" }).version
     expect(kanji).toBeLessThan(bytes)
   })
 
   it("splits mixed text into kanji and non-kanji segments", () => {
-    const { segments } = planEncoding("ABC123" + "日本語".repeat(8), "M", {})
+    const { segments } = planEncoding("ABC123" + "日本語".repeat(8), "M", { kanji: kanjiCodec })
     expect(segments.map((s) => s.mode)).toContain("kanji")
     expect(segments.length).toBeGreaterThan(1)
   })

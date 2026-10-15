@@ -3,7 +3,7 @@
  */
 
 import { InvalidInputError } from "../../errors"
-import { isKanjiChar, toShiftJIS } from "./kanji"
+import type { KanjiCodec } from "./types"
 
 import { ALPHANUMERIC_CHARS } from "./tables"
 
@@ -21,19 +21,25 @@ export function isAlphanumeric(text: string): boolean {
 }
 
 /** Check if a string can be encoded in Kanji mode (Shift-JIS double byte) */
-export function isKanji(text: string): boolean {
+export function isKanji(text: string, kanji: KanjiCodec): boolean {
   if (text.length === 0) return false
   for (const char of text) {
-    if (!isKanjiChar(char)) return false
+    if (kanji.toShiftJIS(char) === undefined) return false
   }
   return true
 }
 
-/** Auto-detect the best encoding mode for the given text */
-export function detectMode(text: string): "numeric" | "alphanumeric" | "byte" | "kanji" {
+/**
+ * Auto-detect the best encoding mode for the given text. Without a kanji
+ * codec, kanji mode is never the answer.
+ */
+export function detectMode(
+  text: string,
+  kanji?: KanjiCodec,
+): "numeric" | "alphanumeric" | "byte" | "kanji" {
   if (isNumeric(text)) return "numeric"
   if (isAlphanumeric(text)) return "alphanumeric"
-  if (isKanji(text)) return "kanji"
+  if (kanji && isKanji(text, kanji)) return "kanji"
   return "byte"
 }
 
@@ -131,10 +137,10 @@ export function encodeKanjiData(sjisValues: number[]): number[] {
  * arithmetically, so anything derived by formula produces symbols that decode
  * to the wrong characters.
  */
-export function unicodeToShiftJIS(text: string): number[] {
+export function unicodeToShiftJIS(text: string, kanji: KanjiCodec): number[] {
   const values: number[] = []
   for (const char of text) {
-    const sjis = toShiftJIS(char)
+    const sjis = kanji.toShiftJIS(char)
     if (sjis === undefined) {
       throw new InvalidInputError(
         `Character "${char}" (U+${char.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")}) cannot be encoded in QR kanji mode`,

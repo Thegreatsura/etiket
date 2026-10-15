@@ -14,9 +14,8 @@
  * running cost is rounded up to a whole bit at each mode switch.
  */
 
-import type { QRSegment } from "./types"
+import type { KanjiCodec, QRSegment } from "./types"
 import { getCharCountBits, ALPHANUMERIC_CHARS } from "./tables"
-import { isKanjiChar } from "./kanji"
 
 type Mode = "numeric" | "alphanumeric" | "byte" | "kanji"
 
@@ -45,7 +44,7 @@ function isAlphanumeric(char: string): boolean {
 }
 
 /** Cost of one character in a mode, in sixths of a bit; Infinity if unusable */
-function charCost(char: string, mode: number): number {
+function charCost(char: string, mode: number, kanji?: KanjiCodec): number {
   switch (mode) {
     case NUMERIC:
       return isDigit(char) ? 20 : Infinity
@@ -53,7 +52,7 @@ function charCost(char: string, mode: number): number {
       return isAlphanumeric(char) ? 33 : Infinity
     case KANJI:
       // 13 bits per character, and only for what Shift-JIS can hold
-      return isKanjiChar(char) ? 78 : Infinity
+      return kanji?.toShiftJIS(char) !== undefined ? 78 : Infinity
     default:
       return utf8Length(char) * 48
   }
@@ -74,11 +73,14 @@ function roundToBit(cost: number): number {
  *   is not QR's four bit indicator plus a version-dependent count. Micro QR
  *   passes its own: the indicator is one to three bits wide there, the counts
  *   are narrower, and a mode a version does not offer costs `Infinity`.
+ * @param kanji - The table kanji mode encodes with; without it no character
+ *   goes to kanji mode
  */
 export function optimizeSegments(
   text: string,
   version: number,
   headBits?: readonly number[],
+  kanji?: KanjiCodec,
 ): QRSegment[] {
   const chars = [...text]
   if (chars.length === 0) return []
@@ -97,7 +99,7 @@ export function optimizeSegments(
     const from = Array.from<number>({ length: MODE_COUNT }).fill(-1)
 
     for (let mode = 0; mode < MODE_COUNT; mode++) {
-      const perChar = charCost(char, mode)
+      const perChar = charCost(char, mode, kanji)
       if (perChar === Infinity) continue
 
       // Staying in the same mode

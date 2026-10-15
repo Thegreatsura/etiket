@@ -8,6 +8,7 @@ import {
   encodeByteData,
   getAlphanumericValue,
 } from "../src/encoders/qr/mode"
+import { kanjiCodec } from "../src/encoders/qr/kanji"
 
 describe("QR mode detection", () => {
   it("detects numeric mode", () => {
@@ -26,7 +27,7 @@ describe("QR mode detection", () => {
   })
 
   it("picks kanji mode for text Shift-JIS can hold", () => {
-    expect(detectMode("日本語")).toBe("kanji")
+    expect(detectMode("日本語", kanjiCodec)).toBe("kanji")
   })
 
   it("falls back to byte mode", () => {

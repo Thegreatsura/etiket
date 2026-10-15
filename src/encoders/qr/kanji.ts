@@ -12,6 +12,8 @@
  * below are parallel: KANJI_CHARS[i] is encoded by KANJI_SJIS[i].
  */
 
+import type { KanjiCodec } from "./types"
+
 /** The Unicode characters kanji mode can encode, in Shift-JIS order */
 const KANJI_CHARS =
   "　、。，．・：；？！゛゜´｀¨＾￣＿ヽヾゝゞ〃仝々〆〇ー―‐／＼～∥｜…‥‘’“”（）〔〕［］｛｝〈〉《》「」『』【】＋" +
@@ -284,6 +286,9 @@ export function fromShiftJIS(sjis: number): string | undefined {
 export function isKanjiChar(char: string): boolean {
   return tables().toSJIS.has(char)
 }
+
+/** The table as a codec, for `encodeQRCore`'s `kanji` option */
+export const kanjiCodec: KanjiCodec = { toShiftJIS }
 
 /** Number of characters kanji mode can encode */
 export const KANJI_CHAR_COUNT = 6962
